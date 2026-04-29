@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AnalysisTask {
+  id          String   @id @default(cuid())
+  url         String
+  urlType     String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  rawData     Json?
+  normalized  String?  @db.Text
+  report      Json?
+  crawlEngine String?
+  promptType  String?
+  errorMsg    String?
+
+  @@index([url])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ApiUsage {
+  id      String   @id @default(cuid())
+  service String
+  date    DateTime @default(now()) @db.Date
+  count   Int      @default(0)
+  costUsd Float    @default(0)
+
+  @@unique([service, date])
+  @@index([date])
+}
+
+model UrlCache {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  data      Json
+  engine    String
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([url])
+  @@index([expiresAt])
+}
