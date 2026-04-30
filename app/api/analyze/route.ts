@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/db";
 import { routeUrl } from "@/src/lib/url-router";
 import { checkLimit, recordUsage } from "@/src/lib/cost-guard";
@@ -155,6 +157,11 @@ async function runPipeline(args: {
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let rawBody: unknown;
   try {
     rawBody = await request.json();

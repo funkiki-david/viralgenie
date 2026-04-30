@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 
 // ============================================================================
 // Types
@@ -74,14 +75,6 @@ const i18n = {
   en: {
     title: "ViralGenie",
     subtitle: "Website, Social Media & Video Platform",
-    auth: {
-      placeholder: "Enter passcode",
-      tagline: "Enter passcode to continue",
-      submit: "Enter",
-      checking: "Checking...",
-      incorrect: "Incorrect passcode",
-      networkError: "Network error",
-    },
     tabs: {
       analyze: "Analyze",
       history: "History",
@@ -195,14 +188,6 @@ const i18n = {
   cn: {
     title: "ViralGenie",
     subtitle: "网站、社交媒体与视频平台",
-    auth: {
-      placeholder: "请输入访问码",
-      tagline: "输入密码以继续",
-      submit: "进入",
-      checking: "验证中...",
-      incorrect: "访问码错误",
-      networkError: "网络错误",
-    },
     footer: "ViralGenie v1.0 · 基于 Next.js + Claude 构建",
     tabs: {
       analyze: "分析",
@@ -2051,102 +2036,6 @@ function LangToggle({
   );
 }
 
-function AuthGate({
-  lang,
-  setLang,
-  onAuth,
-}: {
-  lang: Lang;
-  setLang: (l: Lang) => void;
-  onAuth: () => void;
-}) {
-  const t = i18n[lang];
-  const [passcode, setPasscode] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const submit = async () => {
-    if (!passcode || submitting) return;
-    setError(null);
-    setSubmitting(true);
-    try {
-      const r = await fetch("/api/auth/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode }),
-      });
-      if (r.ok) {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("viralgenie_authed", "1");
-        }
-        onAuth();
-        return;
-      }
-      if (r.status === 401) {
-        setError(t.auth.incorrect);
-      } else {
-        const d = await r.json().catch(() => ({}));
-        setError(d.error ?? `Error ${r.status}`);
-      }
-    } catch {
-      setError(t.auth.networkError);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-gradient-to-br from-purple-50 via-white to-emerald-50">
-      <div className="absolute top-4 right-4">
-        <LangToggle lang={lang} setLang={setLang} />
-      </div>
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center mb-8">
-          <GenieLogo size={88} />
-          <h1
-            className="mt-5 text-4xl bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent"
-            style={{ fontFamily: "var(--font-sora)", fontWeight: 700 }}
-          >
-            {t.title}
-          </h1>
-          <p
-            className="mt-2 text-xs text-zinc-500"
-            style={{ fontFamily: "var(--font-jetbrains-mono)" }}
-          >
-            {t.subtitle}
-          </p>
-          <p className="mt-4 text-sm text-zinc-600">{t.auth.tagline}</p>
-        </div>
-        <div className="rounded-2xl bg-white border border-zinc-200 shadow-xl p-6 space-y-4">
-          <input
-            ref={inputRef}
-            type="password"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder={t.auth.placeholder}
-            className="w-full px-4 py-3 rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
-          />
-          {error && <p className="text-sm text-rose-600">{error}</p>}
-          <button
-            onClick={submit}
-            disabled={!passcode || submitting}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-emerald-500 text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-            style={{ fontFamily: "var(--font-sora)" }}
-          >
-            {submitting ? t.auth.checking : t.auth.submit}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================================
 // Header
 // ============================================================================
@@ -2215,13 +2104,10 @@ function Header({
 
 export default function Home() {
   const [lang, setLang] = useState<Lang>("cn");
-  const [authed, setAuthed] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("analyze");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ok = localStorage.getItem("viralgenie_authed") === "1";
-    setAuthed(ok);
     const savedLang = localStorage.getItem("viralgenie_lang") as Lang | null;
     if (savedLang === "cn" || savedLang === "en") setLang(savedLang);
   }, []);
@@ -2233,25 +2119,8 @@ export default function Home() {
   }, [lang]);
 
   const logout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("viralgenie_authed");
-    }
-    setAuthed(false);
+    void signOut({ callbackUrl: "/login" });
   };
-
-  if (authed === null) {
-    return <div className="min-h-screen" />;
-  }
-
-  if (!authed) {
-    return (
-      <AuthGate
-        lang={lang}
-        setLang={setLang}
-        onAuth={() => setAuthed(true)}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50/30 via-white to-emerald-50/30">

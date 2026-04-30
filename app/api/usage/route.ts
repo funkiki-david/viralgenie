@@ -1,8 +1,15 @@
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/src/lib/auth";
 import { checkLimit, type Service } from "@/src/lib/cost-guard";
 
 const SERVICES: Service[] = ["supadata", "firecrawl", "apify", "claude"];
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const services = await Promise.all(
     SERVICES.map(async (service) => {
       const status = await checkLimit(service);
