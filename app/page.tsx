@@ -82,6 +82,7 @@ const i18n = {
       compare: "Compare",
     },
     footer: "ViralGenie v1.0 · Built with Next.js + Claude",
+    downloadPdf: "Download PDF",
     logout: "Sign out",
     analyze: {
       urlLabel: "URL to analyze",
@@ -189,6 +190,7 @@ const i18n = {
     title: "ViralGenie",
     subtitle: "网站、社交媒体与视频平台",
     footer: "ViralGenie v1.0 · 基于 Next.js + Claude 构建",
+    downloadPdf: "下载 PDF",
     tabs: {
       analyze: "分析",
       history: "历史",
@@ -929,12 +931,21 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
           >
             {t.analyze.reportHeading}
           </h2>
-          <button
-            onClick={reset}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-500 text-white font-medium text-sm hover:shadow-lg transition-all"
-          >
-            + {t.analyze.newAnalysis}
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/reports/${task.id}/pdf`}
+              download={`viralgenie-report-${task.id}.pdf`}
+              className="px-4 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 font-medium text-sm hover:bg-zinc-50 hover:border-zinc-400 transition-all flex items-center gap-1.5"
+            >
+              <span aria-hidden>📄</span> {t.downloadPdf}
+            </a>
+            <button
+              onClick={reset}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-500 text-white font-medium text-sm hover:shadow-lg transition-all"
+            >
+              + {t.analyze.newAnalysis}
+            </button>
+          </div>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm flex flex-wrap items-center gap-3">
           <span
@@ -1166,12 +1177,21 @@ function HistoryTab({ lang }: { lang: Lang }) {
   if (selectedTask && selectedTask.status === "done") {
     return (
       <div className="space-y-6">
-        <button
-          onClick={() => setSelectedId(null)}
-          className="text-sm text-zinc-600 hover:text-zinc-900 flex items-center gap-1"
-        >
-          ← {t.history.back}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedId(null)}
+            className="text-sm text-zinc-600 hover:text-zinc-900 flex items-center gap-1"
+          >
+            ← {t.history.back}
+          </button>
+          <a
+            href={`/api/reports/${selectedTask.id}/pdf`}
+            download={`viralgenie-report-${selectedTask.id}.pdf`}
+            className="px-4 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 font-medium text-sm hover:bg-zinc-50 hover:border-zinc-400 transition-all flex items-center gap-1.5"
+          >
+            <span aria-hidden>📄</span> {t.downloadPdf}
+          </a>
+        </div>
         <ReportRenderer task={selectedTask} lang={lang} />
       </div>
     );
