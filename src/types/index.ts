@@ -31,7 +31,10 @@ export interface UnifiedContent {
 export type AnalysisType =
   | "script_teardown"
   | "product_compare"
-  | "viral_rewrite";
+  | "viral_rewrite"
+  | "seo_audit"
+  | "content_rewrite"
+  | "competitive_strategy";
 
 export type CrawlEngine = "supadata" | "firecrawl" | "apify";
 

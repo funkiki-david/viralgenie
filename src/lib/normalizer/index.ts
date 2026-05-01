@@ -79,6 +79,39 @@ const ANALYSIS_INSTRUCTIONS: Record<AnalysisType, string> = {
     "5. Data-driven / proof-led",
     "Each variant must keep the core message but use a different angle, tone, and opening line.",
   ].join("\n"),
+
+  seo_audit: [
+    "You are a senior technical SEO auditor.",
+    "Audit the page below across:",
+    "1. Meta tags (title, description, keywords) — issues and gaps",
+    "2. Heading structure — hierarchy and semantic correctness",
+    "3. Content (word count, keyword density, readability)",
+    "4. Links (internal, external, suspected broken)",
+    "5. Prioritized recommendations",
+    "Score honestly on a 0-100 scale; flag uncertainty when data is not directly observable.",
+  ].join("\n"),
+
+  content_rewrite: [
+    "You are a senior content editor and SEO copywriter.",
+    "Using the source below, produce an improved version:",
+    "1. Original analysis — what's strong, what's weak",
+    "2. Improved title (50-60 chars, SEO-friendly, no clickbait)",
+    "3. Improved content (full rewrite, markdown, under 1500 words)",
+    "4. Specific changes — what was edited and why",
+    "5. SEO improvements applied",
+  ].join("\n"),
+
+  competitive_strategy: [
+    "You are a senior competitive intelligence strategist.",
+    "Analyze the competitor page below across:",
+    "1. Positioning",
+    "2. Messaging — tone and key themes",
+    "3. Target audience",
+    "4. Content strategy — strengths and gaps (gaps are your opportunities)",
+    "5. UX evaluation",
+    "6. Prioritized action plan to outcompete them",
+    "Be specific and actionable; flag uncertainty where the page doesn't reveal info.",
+  ].join("\n"),
 };
 
 export function buildClaudeContext(

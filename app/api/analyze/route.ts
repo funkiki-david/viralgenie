@@ -26,6 +26,9 @@ const RequestSchema = z.object({
     "script_teardown",
     "product_compare",
     "viral_rewrite",
+    "seo_audit",
+    "content_rewrite",
+    "competitive_strategy",
   ]),
   createdBy: z.string().optional(),
 });

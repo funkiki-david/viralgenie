@@ -9,7 +9,22 @@ import { signOut } from "next-auth/react";
 
 type Lang = "cn" | "en";
 type Tab = "analyze" | "history" | "usage" | "compare";
-type AnalysisType = "script_teardown" | "product_compare" | "viral_rewrite";
+type AnalysisType =
+  | "script_teardown"
+  | "product_compare"
+  | "viral_rewrite"
+  | "seo_audit"
+  | "content_rewrite"
+  | "competitive_strategy";
+
+const ANALYSIS_TYPE_ICONS: Record<AnalysisType, string> = {
+  script_teardown: "🎬",
+  product_compare: "⚖️",
+  viral_rewrite: "🔥",
+  seo_audit: "🔍",
+  content_rewrite: "✍️",
+  competitive_strategy: "🎯",
+};
 type Platform = "youtube" | "tiktok" | "x" | "blog" | "ecommerce" | "other";
 type Engine = "supadata" | "firecrawl" | "apify";
 type TaskStatus = "pending" | "crawling" | "analyzing" | "done" | "failed";
@@ -67,6 +82,65 @@ interface ViralRewriteReport {
   variants?: ViralRewriteVariant[];
 }
 
+interface SeoAuditReport {
+  overallScore?: number;
+  metaTags?: {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    issues?: string[];
+  };
+  headings?: {
+    structure?: string;
+    issues?: string[];
+  };
+  content?: {
+    wordCount?: number;
+    keywordDensity?: string;
+    readability?: string;
+  };
+  links?: {
+    internal?: number;
+    external?: number;
+    broken?: string[];
+  };
+  recommendations?: string[];
+}
+
+interface ContentRewriteChange {
+  what?: string;
+  why?: string;
+}
+
+interface ContentRewriteReport {
+  originalAnalysis?: string;
+  improvedTitle?: string;
+  improvedContent?: string;
+  changes?: ContentRewriteChange[];
+  seoImprovements?: string[];
+}
+
+interface ActionPlanItem {
+  priority?: "high" | "medium" | "low";
+  action?: string;
+  expectedImpact?: string;
+}
+
+interface CompetitiveStrategyReport {
+  positioning?: string;
+  messaging?: {
+    tone?: string;
+    keyThemes?: string[];
+  };
+  targetAudience?: string;
+  contentStrategy?: {
+    strengths?: string[];
+    gaps?: string[];
+  };
+  uxEvaluation?: string;
+  actionPlan?: ActionPlanItem[];
+}
+
 // ============================================================================
 // i18n dictionary
 // ============================================================================
@@ -111,6 +185,18 @@ const i18n = {
         name: "Viral Rewrite",
         desc: "Generate 5 alternate hooks/styles for the same core message.",
       },
+      seo_audit: {
+        name: "SEO Audit",
+        desc: "Score the page on meta tags, headings, content, links, and recommendations.",
+      },
+      content_rewrite: {
+        name: "Content Rewrite",
+        desc: "Produce a fully rewritten, SEO-optimized version with stronger structure and CTAs.",
+      },
+      competitive_strategy: {
+        name: "Competitive Strategy",
+        desc: "Positioning, messaging, audience, UX, and a prioritized plan to outcompete.",
+      },
     },
     steps: {
       pending: "Queued",
@@ -123,7 +209,7 @@ const i18n = {
       youtube: "YouTube",
       tiktok: "TikTok",
       x: "X / Twitter",
-      blog: "Blog / Article",
+      blog: "Blog / Web",
       ecommerce: "E-commerce",
       other: "Other",
     },
@@ -144,6 +230,31 @@ const i18n = {
       competitiveAdvantage: "Competitive Advantage",
       originalAnalysis: "Original Analysis",
       whyItWorks: "Why it works",
+      overallScore: "Overall Score",
+      metaTags: "Meta Tags",
+      headings: "Headings",
+      content: "Content",
+      links: "Links",
+      recommendations: "Recommendations",
+      improvedTitle: "Improved Title",
+      improvedContent: "Improved Content",
+      changes: "Changes",
+      seoImprovements: "SEO Improvements",
+      positioning: "Positioning",
+      messaging: "Messaging",
+      contentStrategy: "Content Strategy",
+      uxEvaluation: "UX Evaluation",
+      actionPlan: "Action Plan",
+      tone: "Tone",
+      keyThemes: "Key Themes",
+      gaps: "Gaps",
+      wordCount: "Word Count",
+      keywordDensity: "Keyword Density",
+      readability: "Readability",
+      internal: "Internal",
+      external: "External",
+      broken: "Broken",
+      issues: "Issues",
     },
     history: {
       empty: "No analyses yet — paste a URL to get started",
@@ -225,6 +336,18 @@ const i18n = {
         name: "病毒改写",
         desc: "围绕同一核心信息生成 5 种不同风格的爆款版本。",
       },
+      seo_audit: {
+        name: "SEO 审计",
+        desc: "评估 Meta 标签、标题层级、内容、链接,给出优化建议。",
+      },
+      content_rewrite: {
+        name: "内容重写",
+        desc: "生成 SEO 优化的全新版本,结构更清晰、CTA 更有力。",
+      },
+      competitive_strategy: {
+        name: "竞品策略",
+        desc: "市场定位、信息传达、目标用户、UX 评估与可执行的击败方案。",
+      },
     },
     steps: {
       pending: "排队中",
@@ -237,7 +360,7 @@ const i18n = {
       youtube: "YouTube",
       tiktok: "TikTok",
       x: "X / 推特",
-      blog: "博客 / 文章",
+      blog: "网站",
       ecommerce: "电商",
       other: "其他",
     },
@@ -258,6 +381,31 @@ const i18n = {
       competitiveAdvantage: "差异化优势",
       originalAnalysis: "原内容分析",
       whyItWorks: "为何有效",
+      overallScore: "整体评分",
+      metaTags: "Meta 标签",
+      headings: "标题层级",
+      content: "内容",
+      links: "链接",
+      recommendations: "优化建议",
+      improvedTitle: "改进标题",
+      improvedContent: "改进内容",
+      changes: "改动详情",
+      seoImprovements: "SEO 优化点",
+      positioning: "市场定位",
+      messaging: "信息传达",
+      contentStrategy: "内容策略",
+      uxEvaluation: "UX 评估",
+      actionPlan: "行动计划",
+      tone: "语气",
+      keyThemes: "核心主题",
+      gaps: "缺口/机会",
+      wordCount: "字数",
+      keywordDensity: "关键词密度",
+      readability: "可读性",
+      internal: "站内",
+      external: "外链",
+      broken: "失效",
+      issues: "问题",
     },
     history: {
       empty: "还没有分析记录 - 粘贴链接开始",
@@ -310,13 +458,23 @@ interface RouteResult {
   platform: Platform;
 }
 
+function normalizeUrlForFetch(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function detectPlatform(rawUrl: string): RouteResult | null {
+  const candidate = normalizeUrlForFetch(rawUrl);
+  if (!candidate) return null;
   let h: string;
   try {
-    h = new URL(rawUrl.trim()).hostname.toLowerCase();
+    h = new URL(candidate).hostname.toLowerCase();
   } catch {
     return null;
   }
+  // Require at least one dot in the hostname (excludes "localhost", "foo", etc.)
+  if (!h.includes(".")) return null;
 
   if (
     h === "youtube.com" ||
@@ -553,7 +711,13 @@ function Stepper({
   );
 }
 
-type ReportLeftAccent = "purple" | "teal" | "coral";
+type ReportLeftAccent =
+  | "purple"
+  | "teal"
+  | "coral"
+  | "sky"
+  | "green"
+  | "indigo";
 
 function ReportCard({
   title,
@@ -581,6 +745,9 @@ function ReportCard({
     purple: "border-l-4 border-l-purple-500",
     teal: "border-l-4 border-l-teal-500",
     coral: "border-l-4 border-l-orange-400",
+    sky: "border-l-4 border-l-sky-500",
+    green: "border-l-4 border-l-green-500",
+    indigo: "border-l-4 border-l-indigo-500",
   };
   const baseGradient = highlighted
     ? "from-amber-50 via-purple-50 to-emerald-50 border-amber-200 ring-1 ring-amber-200/60"
@@ -812,6 +979,408 @@ function ViralRewriteView({
   );
 }
 
+function SeoAuditView({
+  report,
+  lang,
+  compact = false,
+}: {
+  report: SeoAuditReport;
+  lang: Lang;
+  compact?: boolean;
+}) {
+  const s = i18n[lang].sections;
+  const left: ReportLeftAccent = "sky";
+  const gridClass = compact ? "grid gap-4" : "grid gap-4 md:grid-cols-2";
+  const score = typeof report.overallScore === "number" ? report.overallScore : null;
+  const scoreColor =
+    score === null
+      ? "text-zinc-500"
+      : score >= 80
+        ? "text-emerald-600"
+        : score >= 60
+          ? "text-amber-600"
+          : "text-rose-600";
+
+  const renderList = (items?: string[]) =>
+    items && items.length > 0 ? (
+      <ul className="list-disc pl-5 space-y-1.5">
+        {items.map((p, i) => (
+          <li key={i}>{p}</li>
+        ))}
+      </ul>
+    ) : (
+      <p>—</p>
+    );
+
+  return (
+    <div className={gridClass}>
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard title={s.overallScore} icon="📊" leftAccent={left} highlighted>
+          <div className="flex items-baseline gap-3">
+            <span
+              className={`text-5xl font-bold ${scoreColor}`}
+              style={{ fontFamily: "var(--font-sora)" }}
+            >
+              {score === null ? "—" : score}
+            </span>
+            <span className="text-sm text-zinc-500">/ 100</span>
+          </div>
+        </ReportCard>
+      </div>
+
+      <ReportCard title={s.metaTags} icon="🏷️" accent="sky" leftAccent={left}>
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="font-semibold text-zinc-700">Title:</span>{" "}
+            <span>{report.metaTags?.title ?? "—"}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-zinc-700">Description:</span>{" "}
+            <span>{report.metaTags?.description ?? "—"}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-zinc-700">Keywords:</span>{" "}
+            <span>
+              {report.metaTags?.keywords?.length
+                ? report.metaTags.keywords.join(", ")
+                : "—"}
+            </span>
+          </div>
+          {report.metaTags?.issues && report.metaTags.issues.length > 0 && (
+            <div>
+              <p className="font-semibold text-rose-700 mt-2">{s.issues}:</p>
+              {renderList(report.metaTags.issues)}
+            </div>
+          )}
+        </div>
+      </ReportCard>
+
+      <ReportCard title={s.headings} icon="📐" accent="purple" leftAccent={left}>
+        <p className="whitespace-pre-wrap mb-2">
+          {report.headings?.structure ?? "—"}
+        </p>
+        {report.headings?.issues && report.headings.issues.length > 0 && (
+          <>
+            <p className="font-semibold text-rose-700 text-sm mt-2">
+              {s.issues}:
+            </p>
+            {renderList(report.headings.issues)}
+          </>
+        )}
+      </ReportCard>
+
+      <ReportCard title={s.content} icon="📝" accent="emerald" leftAccent={left}>
+        <div className="space-y-1.5 text-sm">
+          <div>
+            <span className="font-semibold text-zinc-700">{s.wordCount}:</span>{" "}
+            {report.content?.wordCount ?? "—"}
+          </div>
+          <div>
+            <span className="font-semibold text-zinc-700">
+              {s.keywordDensity}:
+            </span>{" "}
+            {report.content?.keywordDensity ?? "—"}
+          </div>
+          <div>
+            <span className="font-semibold text-zinc-700">
+              {s.readability}:
+            </span>{" "}
+            {report.content?.readability ?? "—"}
+          </div>
+        </div>
+      </ReportCard>
+
+      <ReportCard title={s.links} icon="🔗" accent="amber" leftAccent={left}>
+        <div className="space-y-1.5 text-sm">
+          <div>
+            <span className="font-semibold text-zinc-700">{s.internal}:</span>{" "}
+            {report.links?.internal ?? "—"}
+          </div>
+          <div>
+            <span className="font-semibold text-zinc-700">{s.external}:</span>{" "}
+            {report.links?.external ?? "—"}
+          </div>
+          {report.links?.broken && report.links.broken.length > 0 && (
+            <div>
+              <p className="font-semibold text-rose-700 mt-2">{s.broken}:</p>
+              {renderList(report.links.broken)}
+            </div>
+          )}
+        </div>
+      </ReportCard>
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.recommendations}
+          icon="✅"
+          leftAccent={left}
+          highlighted
+        >
+          {report.recommendations && report.recommendations.length > 0 ? (
+            <ol className="list-decimal pl-5 space-y-2">
+              {report.recommendations.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ol>
+          ) : (
+            <p>—</p>
+          )}
+        </ReportCard>
+      </div>
+    </div>
+  );
+}
+
+function ContentRewriteView({
+  report,
+  lang,
+  compact = false,
+}: {
+  report: ContentRewriteReport;
+  lang: Lang;
+  compact?: boolean;
+}) {
+  const s = i18n[lang].sections;
+  const left: ReportLeftAccent = "green";
+  const gridClass = compact ? "grid gap-4" : "grid gap-4 md:grid-cols-2";
+
+  return (
+    <div className={gridClass}>
+      {report.originalAnalysis && (
+        <div className={compact ? "" : "md:col-span-2"}>
+          <ReportCard
+            title={s.originalAnalysis}
+            icon="📋"
+            accent="purple"
+            leftAccent={left}
+          >
+            <p className="whitespace-pre-wrap">{report.originalAnalysis}</p>
+          </ReportCard>
+        </div>
+      )}
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.improvedTitle}
+          icon="✨"
+          leftAccent={left}
+          highlighted
+        >
+          <p
+            className="text-xl font-semibold text-zinc-900"
+            style={{ fontFamily: "var(--font-sora)" }}
+          >
+            {report.improvedTitle ?? "—"}
+          </p>
+        </ReportCard>
+      </div>
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.improvedContent}
+          icon="✍️"
+          accent="emerald"
+          leftAccent={left}
+        >
+          <div className="whitespace-pre-wrap leading-relaxed">
+            {report.improvedContent ?? "—"}
+          </div>
+        </ReportCard>
+      </div>
+
+      <ReportCard title={s.changes} icon="🔄" accent="sky" leftAccent={left}>
+        {report.changes && report.changes.length > 0 ? (
+          <ul className="space-y-3">
+            {report.changes.map((c, i) => (
+              <li key={i} className="border-l-2 border-zinc-200 pl-3">
+                <div className="font-semibold text-zinc-800 text-sm">
+                  {c.what ?? "—"}
+                </div>
+                <div className="text-xs text-zinc-600 mt-0.5">
+                  {c.why ?? ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>—</p>
+        )}
+      </ReportCard>
+
+      <ReportCard
+        title={s.seoImprovements}
+        icon="🚀"
+        accent="amber"
+        leftAccent={left}
+      >
+        {report.seoImprovements && report.seoImprovements.length > 0 ? (
+          <ul className="list-disc pl-5 space-y-2">
+            {report.seoImprovements.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>—</p>
+        )}
+      </ReportCard>
+    </div>
+  );
+}
+
+const PRIORITY_BADGE: Record<string, string> = {
+  high: "bg-rose-100 text-rose-700 ring-rose-300",
+  medium: "bg-amber-100 text-amber-700 ring-amber-300",
+  low: "bg-emerald-100 text-emerald-700 ring-emerald-300",
+};
+
+function CompetitiveStrategyView({
+  report,
+  lang,
+  compact = false,
+}: {
+  report: CompetitiveStrategyReport;
+  lang: Lang;
+  compact?: boolean;
+}) {
+  const s = i18n[lang].sections;
+  const left: ReportLeftAccent = "indigo";
+  const gridClass = compact ? "grid gap-4" : "grid gap-4 md:grid-cols-2";
+
+  const renderList = (items?: string[]) =>
+    items && items.length > 0 ? (
+      <ul className="list-disc pl-5 space-y-1.5">
+        {items.map((p, i) => (
+          <li key={i}>{p}</li>
+        ))}
+      </ul>
+    ) : (
+      <p>—</p>
+    );
+
+  return (
+    <div className={gridClass}>
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.positioning}
+          icon="🧭"
+          accent="purple"
+          leftAccent={left}
+        >
+          <p className="whitespace-pre-wrap">{report.positioning ?? "—"}</p>
+        </ReportCard>
+      </div>
+
+      <ReportCard title={s.messaging} icon="💬" accent="sky" leftAccent={left}>
+        <div className="space-y-2">
+          <div>
+            <span className="text-xs uppercase tracking-wide font-semibold text-zinc-500">
+              {s.tone}
+            </span>
+            <p className="text-sm">{report.messaging?.tone ?? "—"}</p>
+          </div>
+          <div>
+            <span className="text-xs uppercase tracking-wide font-semibold text-zinc-500">
+              {s.keyThemes}
+            </span>
+            {report.messaging?.keyThemes &&
+            report.messaging.keyThemes.length > 0 ? (
+              <ul className="list-disc pl-5 mt-1 space-y-1 text-sm">
+                {report.messaging.keyThemes.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>—</p>
+            )}
+          </div>
+        </div>
+      </ReportCard>
+
+      <ReportCard
+        title={s.targetAudience}
+        icon="🎯"
+        accent="emerald"
+        leftAccent={left}
+      >
+        <p className="whitespace-pre-wrap">{report.targetAudience ?? "—"}</p>
+      </ReportCard>
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.contentStrategy}
+          icon="📈"
+          accent="amber"
+          leftAccent={left}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide font-semibold text-emerald-700 mb-2">
+                {s.strengths}
+              </p>
+              {renderList(report.contentStrategy?.strengths)}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide font-semibold text-rose-700 mb-2">
+                {s.gaps}
+              </p>
+              {renderList(report.contentStrategy?.gaps)}
+            </div>
+          </div>
+        </ReportCard>
+      </div>
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard title={s.uxEvaluation} icon="🖥️" accent="rose" leftAccent={left}>
+          <p className="whitespace-pre-wrap">{report.uxEvaluation ?? "—"}</p>
+        </ReportCard>
+      </div>
+
+      <div className={compact ? "" : "md:col-span-2"}>
+        <ReportCard
+          title={s.actionPlan}
+          icon="🏆"
+          leftAccent={left}
+          highlighted
+        >
+          {report.actionPlan && report.actionPlan.length > 0 ? (
+            <ul className="space-y-3">
+              {report.actionPlan.map((item, i) => {
+                const pr = (item.priority ?? "medium").toLowerCase();
+                const badgeClass =
+                  PRIORITY_BADGE[pr] ?? PRIORITY_BADGE.medium;
+                return (
+                  <li
+                    key={i}
+                    className="rounded-lg border border-zinc-200 bg-white/60 p-3"
+                  >
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ${badgeClass}`}
+                      >
+                        {pr}
+                      </span>
+                      <span className="font-semibold text-zinc-900 text-sm">
+                        {item.action ?? "—"}
+                      </span>
+                    </div>
+                    {item.expectedImpact && (
+                      <p className="text-xs text-zinc-600 mt-1">
+                        → {item.expectedImpact}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p>—</p>
+          )}
+        </ReportCard>
+      </div>
+    </div>
+  );
+}
+
 function ReportRenderer({
   task,
   lang,
@@ -842,6 +1411,30 @@ function ReportRenderer({
     );
   if (type === "viral_rewrite")
     return <ViralRewriteView report={report as ViralRewriteReport} lang={lang} />;
+  if (type === "seo_audit")
+    return (
+      <SeoAuditView
+        report={report as SeoAuditReport}
+        lang={lang}
+        compact={compact}
+      />
+    );
+  if (type === "content_rewrite")
+    return (
+      <ContentRewriteView
+        report={report as ContentRewriteReport}
+        lang={lang}
+        compact={compact}
+      />
+    );
+  if (type === "competitive_strategy")
+    return (
+      <CompetitiveStrategyView
+        report={report as CompetitiveStrategyReport}
+        lang={lang}
+        compact={compact}
+      />
+    );
   return null;
 }
 
@@ -905,7 +1498,10 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
       const r = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), analysisType }),
+        body: JSON.stringify({
+          url: normalizeUrlForFetch(url),
+          analysisType,
+        }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -1070,12 +1666,15 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
                 }`}
               >
                 <div
-                  className={`text-base font-semibold mb-1 ${
+                  className={`flex items-center gap-2 text-base font-semibold mb-1 ${
                     isSelected ? "text-purple-900" : "text-zinc-900"
                   }`}
                   style={{ fontFamily: "var(--font-sora)" }}
                 >
-                  {t.types[key].name}
+                  <span className="text-lg leading-none" aria-hidden>
+                    {ANALYSIS_TYPE_ICONS[key]}
+                  </span>
+                  <span>{t.types[key].name}</span>
                 </div>
                 <div className="text-sm text-zinc-600 leading-relaxed">
                   {t.types[key].desc}
@@ -1832,12 +2431,18 @@ function CompareTab({ lang }: { lang: Lang }) {
         fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: urlA.trim(), analysisType }),
+          body: JSON.stringify({
+            url: normalizeUrlForFetch(urlA),
+            analysisType,
+          }),
         }),
         fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: urlB.trim(), analysisType }),
+          body: JSON.stringify({
+            url: normalizeUrlForFetch(urlB),
+            analysisType,
+          }),
         }),
       ]);
       const [dA, dB] = await Promise.all([respA.json(), respB.json()]);
@@ -1981,12 +2586,15 @@ function CompareTab({ lang }: { lang: Lang }) {
                 }`}
               >
                 <div
-                  className={`text-base font-semibold mb-1 ${
+                  className={`flex items-center gap-2 text-base font-semibold mb-1 ${
                     isSelected ? "text-purple-900" : "text-zinc-900"
                   }`}
                   style={{ fontFamily: "var(--font-sora)" }}
                 >
-                  {t.types[key].name}
+                  <span className="text-lg leading-none" aria-hidden>
+                    {ANALYSIS_TYPE_ICONS[key]}
+                  </span>
+                  <span>{t.types[key].name}</span>
                 </div>
                 <div className="text-sm text-zinc-600 leading-relaxed">
                   {t.types[key].desc}
