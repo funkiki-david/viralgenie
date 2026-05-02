@@ -48,3 +48,23 @@ model UrlCache {
   @@index([url])
   @@index([expiresAt])
 }
+
+model AmazonProduct {
+  id          String   @id @default(cuid())
+  asin        String
+  marketplace String   @default("US")
+  title       String
+  brand       String?
+  price       Float?
+  rating      Float?
+  reviewCount Int?
+  bsr         Int?
+  category    String?
+  rawData     Json
+  fetchedAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@unique([asin, marketplace])
+  @@index([asin])
+  @@index([expiresAt])
+}

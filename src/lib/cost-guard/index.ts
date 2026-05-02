@@ -17,8 +17,23 @@ function todayUTC(): Date {
   );
 }
 
+/**
+ * Map a Service to the budget bucket name used both for the env var
+ * (DAILY_<BUCKET>_LIMIT) and the ApiUsage row's service column.
+ *
+ * "amazon-apify" and "amazon-scraper-api" share the bucket "amazon" so they
+ * read DAILY_AMAZON_LIMIT and aggregate their usage in a single DB row.
+ */
+function serviceToBucket(service: Service): string {
+  if (service === "amazon-apify" || service === "amazon-scraper-api") {
+    return "amazon";
+  }
+  return service;
+}
+
 function readLimit(service: Service): number {
-  const raw = process.env[`DAILY_${service.toUpperCase()}_LIMIT`];
+  const bucket = serviceToBucket(service);
+  const raw = process.env[`DAILY_${bucket.toUpperCase()}_LIMIT`];
   if (!raw) return Number.POSITIVE_INFINITY;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0
@@ -29,9 +44,10 @@ function readLimit(service: Service): number {
 export async function checkLimit(service: Service): Promise<LimitStatus> {
   const date = todayUTC();
   const limit = readLimit(service);
+  const bucket = serviceToBucket(service);
 
   const row = await prisma.apiUsage.findUnique({
-    where: { service_date: { service, date } },
+    where: { service_date: { service: bucket, date } },
   });
 
   const used = row?.count ?? 0;
@@ -50,10 +66,11 @@ export async function recordUsage(
   costUsd: number,
 ): Promise<void> {
   const date = todayUTC();
+  const bucket = serviceToBucket(service);
 
   await prisma.apiUsage.upsert({
-    where: { service_date: { service, date } },
-    create: { service, date, count: 1, costUsd },
+    where: { service_date: { service: bucket, date } },
+    create: { service: bucket, date, count: 1, costUsd },
     update: {
       count: { increment: 1 },
       costUsd: { increment: costUsd },

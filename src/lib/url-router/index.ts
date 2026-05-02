@@ -41,7 +41,46 @@ interface HostMatcher {
   platform: Platform;
 }
 
+// Amazon TLDs covered by the dedicated Amazon engine.
+const AMAZON_TLDS = [
+  ".com",
+  ".co.uk",
+  ".de",
+  ".fr",
+  ".it",
+  ".es",
+  ".ca",
+  ".com.au",
+  ".co.jp",
+  ".in",
+  ".com.mx",
+  ".com.br",
+  ".nl",
+  ".pl",
+  ".se",
+  ".sg",
+  ".com.tr",
+  ".ae",
+  ".sa",
+  ".eg",
+];
+
+function isAmazonHost(h: string): boolean {
+  if (h === "amzn.to" || h === "a.co") return true;
+  for (const tld of AMAZON_TLDS) {
+    if (h === `amazon${tld}` || h === `www.amazon${tld}`) return true;
+  }
+  return false;
+}
+
 const HOST_MATCHERS: HostMatcher[] = [
+  // IMPORTANT: Amazon must come before the generic `amazon.` substring matcher
+  // in the ecommerce branch — this entry routes to the dedicated engine.
+  {
+    test: isAmazonHost,
+    engine: "amazon-apify",
+    platform: "amazon",
+  },
   {
     test: (h) =>
       h === "youtube.com" ||

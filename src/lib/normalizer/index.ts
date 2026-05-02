@@ -112,6 +112,25 @@ const ANALYSIS_INSTRUCTIONS: Record<AnalysisType, string> = {
     "6. Prioritized action plan to outcompete them",
     "Be specific and actionable; flag uncertainty where the page doesn't reveal info.",
   ].join("\n"),
+
+  listing_audit: [
+    "You are an Amazon listing optimization expert.",
+    "Audit the product listing below across title, bullets, description, images, pricing, reviews, and keyword coverage.",
+    "Score each section 0-100 honestly. Surface 5-10 prioritized action items.",
+  ].join("\n"),
+
+  review_mining: [
+    "You are a customer insight analyst.",
+    "Mine the reviews and listing data for sentiment, pain points, praises, feature requests, competitor mentions, buyer personas, and listing improvement opportunities.",
+    "Ground every finding in a verbatim quote when one is available.",
+  ].join("\n"),
+
+  competitor_compare: [
+    "You are a competitive intelligence analyst.",
+    "The source contains TWO Amazon products separated by a divider.",
+    "Compare them across price, ratings, reviews, BSR, features, positioning, and pricing strategy.",
+    "Output specific, prioritized recommendations for someone selling against these.",
+  ].join("\n"),
 };
 
 export function buildClaudeContext(
