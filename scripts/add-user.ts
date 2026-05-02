@@ -18,7 +18,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import "dotenv/config";
 import { config as loadEnv } from "dotenv";
 
-loadEnv({ path: ".env.local", override: true });
+// Don't override existing env — when invoked via `railway run`, Railway's
+// injected DATABASE_URL must win over the local .env.local value.
+loadEnv({ path: ".env.local", override: false });
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
