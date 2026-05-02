@@ -49,6 +49,17 @@ model UrlCache {
   @@index([expiresAt])
 }
 
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  hashedPassword String
+  name           String?
+  locale         String   @default("en")
+  role           String   @default("user")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 model AmazonProduct {
   id          String   @id @default(cuid())
   asin        String

@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 // Types
 // ============================================================================
 
-type Lang = "cn" | "en";
+type Lang = "zh" | "en";
 type Tab = "analyze" | "history" | "usage" | "compare";
 type AnalysisType =
   | "script_teardown"
@@ -297,7 +297,7 @@ const i18n = {
         "Compare two URLs side by side. Paste a URL into each field above and pick an analysis type.",
     },
   },
-  cn: {
+  zh: {
     title: "ViralGenie",
     subtitle: "网站、社交媒体与视频平台",
     footer: "ViralGenie v1.0 · 基于 Next.js + Claude 构建",
@@ -693,16 +693,16 @@ function Stepper({
       </div>
       {status === "crawling" && engine && (
         <div className="mt-4 text-center text-sm text-zinc-500">
-          {lang === "cn" ? "正在使用 " : "Using "}
+          {lang === "zh" ? "正在使用 " : "Using "}
           <span className="font-medium text-zinc-700">
             {i18n[lang].engines[engine as Engine] ?? engine}
           </span>
-          {lang === "cn" ? " 抓取内容..." : " to crawl content..."}
+          {lang === "zh" ? " 抓取内容..." : " to crawl content..."}
         </div>
       )}
       {status === "analyzing" && (
         <div className="mt-4 text-center text-sm text-zinc-500">
-          {lang === "cn"
+          {lang === "zh"
             ? "Claude 正在生成结构化报告..."
             : "Claude is generating the structured report..."}
         </div>
@@ -1891,7 +1891,7 @@ function HistoryTab({ lang }: { lang: Lang }) {
                     className="hover:bg-zinc-50/50 transition-colors"
                   >
                     <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">
-                      {dt.toLocaleString(lang === "cn" ? "zh-CN" : "en-US")}
+                      {dt.toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
                     </td>
                     <td
                       className="px-4 py-3 text-zinc-700 max-w-xs truncate"
@@ -2070,7 +2070,7 @@ function summarizeDifferences(
 ): string[] {
   const a = (taskA.report ?? {}) as Record<string, unknown>;
   const b = (taskB.report ?? {}) as Record<string, unknown>;
-  const isCN = lang === "cn";
+  const isCN = lang === "zh";
   const out: string[] = [];
 
   const len = (v: unknown) => (typeof v === "string" ? v.trim().length : 0);
@@ -2641,9 +2641,9 @@ function LangToggle({
   return (
     <div className="inline-flex rounded-full bg-zinc-100 p-1 text-xs font-medium">
       <button
-        onClick={() => setLang("cn")}
+        onClick={() => setLang("zh")}
         className={`px-3 py-1.5 rounded-full transition-all ${
-          lang === "cn"
+          lang === "zh"
             ? "bg-white text-zinc-900 shadow-sm"
             : "text-zinc-500 hover:text-zinc-700"
         }`}
@@ -2731,19 +2731,46 @@ function Header({
 // ============================================================================
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("cn");
+  // Default "en" for SSR consistency. Real value resolved on mount from
+  // (1) the authenticated session's user.locale, falling back to (2) any
+  // cached localStorage choice.
+  const [lang, setLang] = useState<Lang>("en");
   const [tab, setTab] = useState<Tab>("analyze");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const savedLang = localStorage.getItem("viralgenie_lang") as Lang | null;
-    if (savedLang === "cn" || savedLang === "en") setLang(savedLang);
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const s = (await r.json()) as { user?: { locale?: string } } | null;
+        const sessionLocale = s?.user?.locale;
+        if (sessionLocale === "zh" || sessionLocale === "en") {
+          if (!cancelled) setLang(sessionLocale);
+          return;
+        }
+      } catch {
+        // fall through to localStorage
+      }
+      const saved = localStorage.getItem("viralgenie_lang") as Lang | null;
+      if (!cancelled && (saved === "zh" || saved === "en")) setLang(saved);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("viralgenie_lang", lang);
-    }
+    if (typeof window === "undefined") return;
+    localStorage.setItem("viralgenie_lang", lang);
+    // Persist to user record. Fire-and-forget — 401 (not logged in) silently
+    // fails, which is correct behavior on the brief window between mount and
+    // the session check above.
+    fetch("/api/user/locale", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: lang }),
+    }).catch(() => {});
   }, [lang]);
 
   const logout = () => {
