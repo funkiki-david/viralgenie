@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 
 // ============================================================================
@@ -157,6 +157,7 @@ const i18n = {
     },
     footer: "ViralGenie v1.0 · Built with Next.js + Claude",
     downloadPdf: "Download PDF",
+    workingHint: "Genie is working on it...",
     logout: "Sign out",
     analyze: {
       urlLabel: "URL to analyze",
@@ -302,6 +303,7 @@ const i18n = {
     subtitle: "网站、社交媒体与视频平台",
     footer: "ViralGenie v1.0 · 基于 Next.js + Claude 构建",
     downloadPdf: "下载 PDF",
+    workingHint: "妖精正在处理...",
     tabs: {
       analyze: "分析",
       history: "历史",
@@ -531,7 +533,9 @@ const STEPS: TaskStatus[] = ["pending", "crawling", "analyzing", "done"];
 // ============================================================================
 
 function GenieLogo({ size = 64 }: { size?: number }) {
-  const id = useMemo(() => `gg-${Math.random().toString(36).slice(2, 8)}`, []);
+  // useId() returns a stable id that matches between SSR and client hydration.
+  // Sanitize colons so the value is safe inside fill="url(#id)" everywhere.
+  const id = `gg-${useId().replace(/:/g, "")}`;
   return (
     <svg
       viewBox="0 0 64 64"
@@ -639,10 +643,12 @@ function Stepper({
   status,
   engine,
   lang,
+  isAdmin,
 }: {
   status: TaskStatus;
   engine?: string | null;
   lang: Lang;
+  isAdmin: boolean;
 }) {
   const t = i18n[lang];
   const currentIdx = STEPS.indexOf(status === "failed" ? "pending" : status);
@@ -691,20 +697,23 @@ function Stepper({
           );
         })}
       </div>
-      {status === "crawling" && engine && (
+      {(status === "crawling" || status === "analyzing") && (
         <div className="mt-4 text-center text-sm text-zinc-500">
-          {lang === "zh" ? "正在使用 " : "Using "}
-          <span className="font-medium text-zinc-700">
-            {i18n[lang].engines[engine as Engine] ?? engine}
-          </span>
-          {lang === "zh" ? " 抓取内容..." : " to crawl content..."}
-        </div>
-      )}
-      {status === "analyzing" && (
-        <div className="mt-4 text-center text-sm text-zinc-500">
-          {lang === "zh"
-            ? "Claude 正在生成结构化报告..."
-            : "Claude is generating the structured report..."}
+          {!isAdmin ? (
+            t.workingHint
+          ) : status === "crawling" && engine ? (
+            <>
+              {lang === "zh" ? "正在使用 " : "Using "}
+              <span className="font-medium text-zinc-700">
+                {i18n[lang].engines[engine as Engine] ?? engine}
+              </span>
+              {lang === "zh" ? " 抓取内容..." : " to crawl content..."}
+            </>
+          ) : status === "analyzing" ? (
+            lang === "zh"
+              ? "Claude 正在生成结构化报告..."
+              : "Claude is generating the structured report..."
+          ) : null}
         </div>
       )}
     </div>
@@ -1442,7 +1451,7 @@ function ReportRenderer({
 // Tabs
 // ============================================================================
 
-function AnalyzeTab({ lang }: { lang: Lang }) {
+function AnalyzeTab({ lang, isAdmin }: { lang: Lang; isAdmin: boolean }) {
   const t = i18n[lang];
   const [url, setUrl] = useState("");
   const [analysisType, setAnalysisType] =
@@ -1551,7 +1560,7 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
             {task.url}
           </span>
           <PlatformBadge platform={task.urlType as Platform} lang={lang} />
-          {task.crawlEngine && (
+          {isAdmin && task.crawlEngine && (
             <span className="text-xs text-zinc-500">
               · {t.engines[task.crawlEngine as Engine] ?? task.crawlEngine}
             </span>
@@ -1593,7 +1602,12 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
           {t.analyze.stepperHeading}
         </h2>
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <Stepper status={task.status} engine={task.crawlEngine} lang={lang} />
+          <Stepper
+            status={task.status}
+            engine={task.crawlEngine}
+            lang={lang}
+            isAdmin={isAdmin}
+          />
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm flex flex-wrap items-center gap-3">
           <span
@@ -1631,13 +1645,19 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
             <>
               <span className="text-zinc-500">{t.analyze.detected}:</span>
               <PlatformBadge platform={detected.platform} lang={lang} />
-              <span className="text-zinc-300">·</span>
-              <span className="text-zinc-500">{t.analyze.routePreview}:</span>
-              <RoutePreview
-                engine={detected.engine}
-                analysisType={analysisType}
-                lang={lang}
-              />
+              {isAdmin && (
+                <>
+                  <span className="text-zinc-300">·</span>
+                  <span className="text-zinc-500">
+                    {t.analyze.routePreview}:
+                  </span>
+                  <RoutePreview
+                    engine={detected.engine}
+                    analysisType={analysisType}
+                    lang={lang}
+                  />
+                </>
+              )}
             </>
           ) : (
             <span className="text-zinc-400">{t.analyze.noDetection}</span>
@@ -1720,7 +1740,7 @@ const HISTORY_FILTER_PLATFORMS: Platform[] = [
   "ecommerce",
 ];
 
-function HistoryTab({ lang }: { lang: Lang }) {
+function HistoryTab({ lang, isAdmin }: { lang: Lang; isAdmin: boolean }) {
   const t = i18n[lang];
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1872,9 +1892,11 @@ function HistoryTab({ lang }: { lang: Lang }) {
                 <th className="px-4 py-3 font-medium">
                   {t.history.headers.type}
                 </th>
-                <th className="px-4 py-3 font-medium">
-                  {t.history.headers.engine}
-                </th>
+                {isAdmin && (
+                  <th className="px-4 py-3 font-medium">
+                    {t.history.headers.engine}
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium">
                   {t.history.headers.status}
                 </th>
@@ -1918,12 +1940,14 @@ function HistoryTab({ lang }: { lang: Lang }) {
                         <span className="text-zinc-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-zinc-700 text-xs">
-                      {task.crawlEngine
-                        ? t.engines[task.crawlEngine as Engine] ??
-                          task.crawlEngine
-                        : "—"}
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-zinc-700 text-xs">
+                        {task.crawlEngine
+                          ? t.engines[task.crawlEngine as Engine] ??
+                            task.crawlEngine
+                          : "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
@@ -2289,10 +2313,12 @@ function CompareSide({
   label,
   task,
   lang,
+  isAdmin,
 }: {
   label: "A" | "B";
   task: Task | null;
   lang: Lang;
+  isAdmin: boolean;
 }) {
   const t = i18n[lang];
   if (!task) return null;
@@ -2307,7 +2333,7 @@ function CompareSide({
           {label}
         </span>
         <PlatformBadge platform={task.urlType as Platform} lang={lang} />
-        {task.crawlEngine && (
+        {isAdmin && task.crawlEngine && (
           <span className="text-xs text-zinc-500">
             · {t.engines[task.crawlEngine as Engine] ?? task.crawlEngine}
           </span>
@@ -2334,14 +2360,19 @@ function CompareSide({
         </div>
       ) : (
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <Stepper status={task.status} engine={task.crawlEngine} lang={lang} />
+          <Stepper
+            status={task.status}
+            engine={task.crawlEngine}
+            lang={lang}
+            isAdmin={isAdmin}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function CompareTab({ lang }: { lang: Lang }) {
+function CompareTab({ lang, isAdmin }: { lang: Lang; isAdmin: boolean }) {
   const t = i18n[lang];
   const [urlA, setUrlA] = useState("");
   const [urlB, setUrlB] = useState("");
@@ -2494,10 +2525,10 @@ function CompareTab({ lang }: { lang: Lang }) {
 
         <div className="grid gap-6 md:grid-cols-2 md:divide-x md:divide-zinc-200">
           <div className="md:pr-6">
-            <CompareSide label="A" task={taskA} lang={lang} />
+            <CompareSide label="A" task={taskA} lang={lang} isAdmin={isAdmin} />
           </div>
           <div className="md:pl-6">
-            <CompareSide label="B" task={taskB} lang={lang} />
+            <CompareSide label="B" task={taskB} lang={lang} isAdmin={isAdmin} />
           </div>
         </div>
       </div>
@@ -2674,14 +2705,19 @@ function Header({
   tab,
   setTab,
   onLogout,
+  isAdmin,
 }: {
   lang: Lang;
   setLang: (l: Lang) => void;
   tab: Tab;
   setTab: (t: Tab) => void;
   onLogout: () => void;
+  isAdmin: boolean;
 }) {
   const t = i18n[lang];
+  const visibleTabs = (Object.keys(t.tabs) as Tab[]).filter(
+    (k) => isAdmin || k !== "usage",
+  );
   return (
     <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur-md">
       <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -2699,7 +2735,7 @@ function Header({
         </div>
         <div className="flex items-center gap-3">
           <nav className="inline-flex rounded-full bg-zinc-100 p-1 text-sm font-medium">
-            {(Object.keys(t.tabs) as Tab[]).map((key) => (
+            {visibleTabs.map((key) => (
               <button
                 key={key}
                 onClick={() => setTab(key)}
@@ -2736,6 +2772,10 @@ export default function Home() {
   // cached localStorage choice.
   const [lang, setLang] = useState<Lang>("en");
   const [tab, setTab] = useState<Tab>("analyze");
+  // isAdmin gates the display of API service names (Supadata/Firecrawl/etc.)
+  // and the Usage tab. Default false so non-admin UI is the safe state during
+  // the brief window before the session check resolves.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2743,7 +2783,10 @@ export default function Home() {
     (async () => {
       try {
         const r = await fetch("/api/auth/session");
-        const s = (await r.json()) as { user?: { locale?: string } } | null;
+        const s = (await r.json()) as {
+          user?: { locale?: string; role?: string };
+        } | null;
+        if (!cancelled && s?.user?.role === "admin") setIsAdmin(true);
         const sessionLocale = s?.user?.locale;
         if (sessionLocale === "zh" || sessionLocale === "en") {
           if (!cancelled) setLang(sessionLocale);
@@ -2785,12 +2828,13 @@ export default function Home() {
         tab={tab}
         setTab={setTab}
         onLogout={logout}
+        isAdmin={isAdmin}
       />
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-        {tab === "analyze" && <AnalyzeTab lang={lang} />}
-        {tab === "compare" && <CompareTab lang={lang} />}
-        {tab === "history" && <HistoryTab lang={lang} />}
-        {tab === "usage" && <UsageTab lang={lang} />}
+        {tab === "analyze" && <AnalyzeTab lang={lang} isAdmin={isAdmin} />}
+        {tab === "compare" && <CompareTab lang={lang} isAdmin={isAdmin} />}
+        {tab === "history" && <HistoryTab lang={lang} isAdmin={isAdmin} />}
+        {tab === "usage" && isAdmin && <UsageTab lang={lang} />}
       </main>
       <footer
         className="text-center text-xs text-zinc-400 py-6"

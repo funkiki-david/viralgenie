@@ -9,6 +9,9 @@ export async function GET() {
   if (!session) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role !== "admin") {
+    return Response.json({ error: "Admin access required" }, { status: 403 });
+  }
 
   const services = await Promise.all(
     SERVICES.map(async (service) => {

@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           locale: user.locale,
+          role: user.role,
         };
       },
     }),
@@ -64,6 +65,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email!;
         token.name = user.name ?? null;
         token.locale = user.locale;
+        token.role = user.role;
       }
       return token;
     },
@@ -73,6 +75,7 @@ export const authOptions: NextAuthOptions = {
         email: token.email,
         name: token.name ?? null,
         locale: token.locale,
+        role: token.role,
       };
       return session;
     },

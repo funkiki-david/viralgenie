@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 
 type Lang = "zh" | "en";
@@ -49,7 +49,9 @@ function detectBrowserLang(): Lang {
 }
 
 function GenieLogo({ size = 88 }: { size?: number }) {
-  const id = useMemo(() => `gg-${Math.random().toString(36).slice(2, 8)}`, []);
+  // useId() returns a stable id that matches between SSR and client hydration.
+  // Sanitize colons so the value is safe inside fill="url(#id)" everywhere.
+  const id = `gg-${useId().replace(/:/g, "")}`;
   return (
     <svg
       viewBox="0 0 64 64"

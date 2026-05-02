@@ -48,17 +48,21 @@ function reportContainsCJK(report: unknown): boolean {
   return CJK_RE.test(JSON.stringify(report));
 }
 
-function buildPdf(task: {
-  id: string;
-  url: string;
-  urlType: string;
-  status: string;
-  crawlEngine?: string | null;
-  promptType?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  report: unknown;
+function buildPdf(args: {
+  task: {
+    id: string;
+    url: string;
+    urlType: string;
+    status: string;
+    crawlEngine?: string | null;
+    promptType?: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    report: unknown;
+  };
+  isAdmin: boolean;
 }): ArrayBuffer {
+  const { task, isAdmin } = args;
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
@@ -189,7 +193,9 @@ function buildPdf(task: {
 
   setStyle(10, "normal", [80, 80, 80]);
   pdf.text(
-    `Type: ${task.promptType ?? "-"}    Platform: ${task.urlType}    Engine: ${task.crawlEngine ?? "-"}`,
+    isAdmin
+      ? `Type: ${task.promptType ?? "-"}    Platform: ${task.urlType}    Engine: ${task.crawlEngine ?? "-"}`
+      : `Type: ${task.promptType ?? "-"}    Platform: ${task.urlType}`,
     margin,
     y,
   );
@@ -291,7 +297,8 @@ export async function GET(
     );
   }
 
-  const buf = buildPdf(task);
+  const isAdmin = session.user.role === "admin";
+  const buf = buildPdf({ task, isAdmin });
 
   return new Response(buf, {
     status: 200,

@@ -8,6 +8,7 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       locale: string;
+      role: string;
     };
   }
 
@@ -16,6 +17,7 @@ declare module "next-auth" {
     email: string;
     name?: string | null;
     locale: string;
+    role: string;
   }
 }
 
@@ -25,5 +27,6 @@ declare module "next-auth/jwt" {
     email: string;
     name?: string | null;
     locale: string;
+    role: string;
   }
 }
