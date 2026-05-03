@@ -155,7 +155,6 @@ const i18n = {
       usage: "Usage",
       compare: "Compare",
     },
-    footer: "ViralGenie v1.0 · Built with Next.js + Claude",
     downloadPdf: "Download PDF",
     workingHint: "Genie is working on it...",
     logout: "Sign out",
@@ -301,7 +300,6 @@ const i18n = {
   zh: {
     title: "ViralGenie",
     subtitle: "网站、社交媒体与视频平台",
-    footer: "ViralGenie v1.0 · 基于 Next.js + Claude 构建",
     downloadPdf: "下载 PDF",
     workingHint: "妖精正在处理...",
     tabs: {
@@ -2836,12 +2834,6 @@ export default function Home() {
         {tab === "history" && <HistoryTab lang={lang} isAdmin={isAdmin} />}
         {tab === "usage" && isAdmin && <UsageTab lang={lang} />}
       </main>
-      <footer
-        className="text-center text-xs text-zinc-400 py-6"
-        style={{ fontFamily: "var(--font-jetbrains-mono)" }}
-      >
-        {i18n[lang].footer}
-      </footer>
     </div>
   );
 }
