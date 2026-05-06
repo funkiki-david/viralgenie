@@ -333,7 +333,7 @@ const i18n = {
         desc: "提取产品页的功能、定价与用户痛点。",
       },
       viral_rewrite: {
-        name: "病毒改写",
+        name: "爆款改写",
         desc: "围绕同一核心信息生成 5 种不同风格的爆款版本。",
       },
       seo_audit: {
@@ -2719,7 +2719,12 @@ function Header({
   return (
     <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur-md">
       <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setTab("analyze")}
+          aria-label={t.title}
+          className="flex items-center gap-3 -m-1 p-1 rounded-lg hover:bg-zinc-100/60 transition-colors text-left"
+        >
           <GenieLogo size={36} />
           <div>
             <div
@@ -2730,7 +2735,7 @@ function Header({
             </div>
             <div className="text-xs text-zinc-500 -mt-0.5">{t.subtitle}</div>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-3">
           <nav className="inline-flex rounded-full bg-zinc-100 p-1 text-sm font-medium">
             {visibleTabs.map((key) => (

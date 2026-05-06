@@ -175,7 +175,11 @@ export default function LoginPage() {
         <LangToggle lang={lang} setLang={setLang} />
       </div>
       <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center mb-8">
+        <a
+          href="/"
+          aria-label={t.title}
+          className="flex flex-col items-center text-center mb-8 -mx-2 px-2 py-2 rounded-lg hover:opacity-90 transition-opacity"
+        >
           <GenieLogo size={88} />
           <h1
             className="mt-5 text-4xl bg-gradient-to-r from-purple-600 to-emerald-600 bg-clip-text text-transparent"
@@ -190,7 +194,7 @@ export default function LoginPage() {
             {t.subtitle}
           </p>
           <p className="mt-4 text-sm text-zinc-600">{t.tagline}</p>
-        </div>
+        </a>
         <div className="rounded-2xl bg-white border border-zinc-200 shadow-xl p-6 space-y-3">
           <div>
             <label
