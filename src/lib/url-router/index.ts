@@ -87,7 +87,7 @@ const HOST_MATCHERS: HostMatcher[] = [
       h.endsWith(".youtube.com") ||
       h === "youtu.be" ||
       h === "m.youtube.com",
-    engine: "supadata",
+    engine: "tikhub",
     platform: "youtube",
   },
   {
@@ -95,8 +95,39 @@ const HOST_MATCHERS: HostMatcher[] = [
       h === "tiktok.com" ||
       h.endsWith(".tiktok.com") ||
       h === "vm.tiktok.com",
-    engine: "supadata",
+    engine: "tikhub",
     platform: "tiktok",
+  },
+  {
+    test: (h) => h === "instagram.com" || h.endsWith(".instagram.com"),
+    engine: "tikhub",
+    platform: "instagram",
+  },
+  {
+    test: (h) =>
+      h === "douyin.com" ||
+      h.endsWith(".douyin.com") ||
+      h === "iesdouyin.com" ||
+      h.endsWith(".iesdouyin.com"),
+    engine: "tikhub",
+    platform: "douyin",
+  },
+  {
+    test: (h) =>
+      h === "xiaohongshu.com" ||
+      h.endsWith(".xiaohongshu.com") ||
+      h === "xhslink.com" ||
+      h.endsWith(".xhslink.com"),
+    engine: "tikhub",
+    platform: "xiaohongshu",
+  },
+  {
+    test: (h) =>
+      h === "bilibili.com" ||
+      h.endsWith(".bilibili.com") ||
+      h === "b23.tv",
+    engine: "tikhub",
+    platform: "bilibili",
   },
   {
     test: (h) =>

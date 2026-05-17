@@ -3,7 +3,7 @@ import { getSystemPrompt } from "@/src/lib/ai/prompts";
 import type { AnalysisType } from "@/src/types";
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 4096;
+const MAX_TOKENS = 6000;
 
 export type AnalyzeResult =
   | { success: true; result: string }
@@ -12,6 +12,7 @@ export type AnalyzeResult =
 export async function analyzeContent(
   markdown: string,
   analysisType: AnalysisType,
+  locale: "en" | "zh" = "en",
 ): Promise<AnalyzeResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -19,7 +20,10 @@ export async function analyzeContent(
   }
 
   const client = new Anthropic({ apiKey });
-  const systemPrompt = getSystemPrompt(analysisType);
+  const languageName = locale === "zh" ? "Simplified Chinese" : "English";
+  const systemPrompt = `${getSystemPrompt(analysisType)}
+
+Output language: ${languageName}. Keep JSON keys exactly as specified, but write all user-facing string values in ${languageName}.`;
 
   try {
     const response = await client.messages.create({
@@ -39,6 +43,13 @@ export async function analyzeContent(
       .filter((block): block is Anthropic.TextBlock => block.type === "text")
       .map((block) => block.text)
       .join("");
+
+    if (response.stop_reason === "max_tokens") {
+      return {
+        success: false,
+        error: "Claude response was truncated before completion. Please try again or narrow the input URL.",
+      };
+    }
 
     if (!text) {
       return { success: false, error: "Claude returned no text content" };

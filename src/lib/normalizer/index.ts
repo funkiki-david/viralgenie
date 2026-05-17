@@ -1,4 +1,4 @@
-import type { AnalysisType, UnifiedContent } from "@/src/types";
+import type { AnalysisType, SocialProfile, UnifiedContent } from "@/src/types";
 
 function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
@@ -12,6 +12,7 @@ function formatDate(iso: string): string {
 
 export function normalizeToMarkdown(content: UnifiedContent): string {
   const sections: string[] = [];
+  const socialProfiles = readSocialProfiles(content.metadata.socialProfiles);
 
   sections.push(`# ${content.title || "(Untitled)"}`);
 
@@ -47,7 +48,61 @@ export function normalizeToMarkdown(content: UnifiedContent): string {
     sections.push(`## Tags\n${tags}`);
   }
 
+  if (socialProfiles.length > 0) {
+    const rows = socialProfiles.map((profile) => {
+      const parts = [
+        `**${profile.platform}**`,
+        profile.handle ? `handle: @${profile.handle}` : "",
+        profile.accountName ? `name: ${profile.accountName}` : "",
+        `url: ${profile.canonicalUrl}`,
+        `confidence: ${profile.confidence}`,
+        profile.evidence.length > 0
+          ? `evidence: ${profile.evidence.join("; ")}`
+          : "",
+      ].filter(Boolean);
+      return `- ${parts.join(" | ")}`;
+    });
+    sections.push(`## Social Profiles\n${rows.join("\n")}`);
+  }
+
   return sections.join("\n\n") + "\n";
+}
+
+function readSocialProfiles(value: unknown): SocialProfile[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const profile = item as Record<string, unknown>;
+    if (
+      typeof profile.platform !== "string" ||
+      typeof profile.url !== "string" ||
+      typeof profile.canonicalUrl !== "string" ||
+      typeof profile.hostname !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        platform: profile.platform as SocialProfile["platform"],
+        url: profile.url,
+        canonicalUrl: profile.canonicalUrl,
+        handle: typeof profile.handle === "string" ? profile.handle : undefined,
+        accountPath:
+          typeof profile.accountPath === "string" ? profile.accountPath : undefined,
+        accountName:
+          typeof profile.accountName === "string" ? profile.accountName : undefined,
+        hostname: profile.hostname,
+        evidence: Array.isArray(profile.evidence)
+          ? profile.evidence.filter(
+              (entry): entry is string => typeof entry === "string",
+            )
+          : [],
+        confidence: profile.confidence === "high" ? "high" : "medium",
+      } satisfies SocialProfile,
+    ];
+  });
 }
 
 const ANALYSIS_INSTRUCTIONS: Record<AnalysisType, string> = {
@@ -111,6 +166,20 @@ const ANALYSIS_INSTRUCTIONS: Record<AnalysisType, string> = {
     "5. UX evaluation",
     "6. Prioritized action plan to outcompete them",
     "Be specific and actionable; flag uncertainty where the page doesn't reveal info.",
+  ].join("\n"),
+
+  backlink_intel: [
+    "You are a connection analysis strategist for websites and brands.",
+    "Analyze the page below as a website-to-social reverse lookup.",
+    "Treat the Social Profiles section as the strongest structured evidence for official account extraction.",
+    "Produce:",
+    "1. Brand summary",
+    "2. Official social accounts and account identity details",
+    "3. Platform presence across owned and related channels",
+    "4. Connection analysis covering owned channels, community signals, media signals, and cross-platform flow",
+    "5. Related media, community, partner, directory, or creator connections",
+    "6. Distribution opportunities and reusable creative angles",
+    "Use page links, metadata, brand mentions, and visible account references. Flag uncertainty clearly when something is inferred.",
   ].join("\n"),
 
   listing_audit: [

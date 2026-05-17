@@ -280,7 +280,7 @@ export async function POST(request: Request) {
       url: taskUrl,
       urlType: "amazon",
       status: "crawling",
-      createdBy: (session.user?.name ?? "anonymous") as string,
+      createdBy: session.user.email,
       crawlEngine: engine,
       promptType: analysisType,
     },

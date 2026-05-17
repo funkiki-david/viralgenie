@@ -1,5 +1,27 @@
 import type { AnalysisType } from "@/src/types";
 
+const CREATIVE_PACK_SCHEMA = `
+  "creativePack": {
+    "imagePrompts": {
+      "midjourney": string,
+      "dalle": string
+    },
+    "videoScript15s": string,
+    "shotPrompts": string[],
+    "readyToPostCopy": string[],
+    "hookOptions": string[],
+    "outreachCopy": string[]
+  }`;
+
+const CREATIVE_PACK_RULES = `- Include creativePack in the same JSON object for every analysis.
+- creativePack.imagePrompts.midjourney: a polished Midjourney prompt for a marketing visual inspired by the source.
+- creativePack.imagePrompts.dalle: a DALL-E prompt with clear subject, composition, style, and text/no-text guidance.
+- creativePack.videoScript15s: a complete 15-second short video script with timed beats.
+- creativePack.shotPrompts: 4-6 concise shot prompts matching the 15-second script.
+- creativePack.readyToPostCopy: EXACTLY 3 ready-to-publish social captions.
+- creativePack.hookOptions: 3-5 alternate hooks or opening angles.
+- creativePack.outreachCopy: 2-4 short outreach-ready blurbs that could be used in DMs, emails, or page CTA support copy.`;
+
 const SCRIPT_TEARDOWN_PROMPT = `You are a short-form video script analyst.
 
 Analyze the provided content and return a single JSON object with EXACTLY this shape:
@@ -10,14 +32,16 @@ Analyze the provided content and return a single JSON object with EXACTLY this s
   "cta": string,                   // The explicit or implicit call to action
   "pacing": string,                // Description of rhythm, beat changes, dwell time
   "emotionalArc": string,          // How emotion shifts from open to close
-  "keyTakeaways": string[]         // Concrete lessons a creator can reuse
+  "keyTakeaways": string[],        // Concrete lessons a creator can reuse
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
 - Return ONLY the JSON object. No prose before or after.
 - All string fields must be non-empty.
 - Quote the script verbatim where it sharpens the analysis.
-- If a field is genuinely not inferable from the content, use a short explanatory string (e.g. "No explicit CTA").`;
+- If a field is genuinely not inferable from the content, use a short explanatory string (e.g. "No explicit CTA").
+${CREATIVE_PACK_RULES}`;
 
 const PRODUCT_COMPARE_PROMPT = `You are a product research analyst.
 
@@ -30,13 +54,15 @@ Analyze the provided content and return a single JSON object with EXACTLY this s
   "painPoints": string[],            // User complaints, friction, missing features
   "strengths": string[],             // What the product does well
   "weaknesses": string[],            // Where it falls short
-  "competitiveAdvantage": string     // The single sharpest differentiator
+  "competitiveAdvantage": string,    // The single sharpest differentiator
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
 - Return ONLY the JSON object. No prose before or after.
 - Arrays must contain at least one item; use ["Not specified"] if truly absent.
-- Do NOT invent features or prices not present in the source. Flag uncertainty inline (e.g. "Implied, not stated").`;
+- Do NOT invent features or prices not present in the source. Flag uncertainty inline (e.g. "Implied, not stated").
+${CREATIVE_PACK_RULES}`;
 
 const VIRAL_REWRITE_PROMPT = `You are a viral content rewriter.
 
@@ -50,14 +76,16 @@ Analyze the provided content and return a single JSON object with EXACTLY this s
     { "style": "listicle",           "content": string, "whyItWorks": string },
     { "style": "personal_story",     "content": string, "whyItWorks": string },
     { "style": "data_driven",        "content": string, "whyItWorks": string }
-  ]
+  ],
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
 - Return ONLY the JSON object. No prose before or after.
 - The variants array MUST have exactly 5 items in the order shown.
 - Each variant.content is a complete rewrite (not a summary), preserving the core message.
-- Each variant.whyItWorks is one tight sentence on the psychological lever.`;
+- Each variant.whyItWorks is one tight sentence on the psychological lever.
+${CREATIVE_PACK_RULES}`;
 
 const SEO_AUDIT_PROMPT = `You are a senior technical SEO auditor.
 
@@ -85,14 +113,16 @@ Analyze the provided content and return a single JSON object with EXACTLY this s
     "external": number,
     "broken": string[]
   },
-  "recommendations": string[]
+  "recommendations": string[],
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
 - Return ONLY the JSON object. No prose before or after.
 - overallScore is 0-100, an honest composite SEO health score (not generous).
 - Where the source markdown does not directly reveal data (e.g., raw HTML metadata, exact link counts), make reasonable inferences and flag uncertainty inline (e.g. "estimated").
-- recommendations must be 5-8 prioritized, actionable items — no vague platitudes.`;
+- recommendations must be 5-8 prioritized, actionable items — no vague platitudes.
+${CREATIVE_PACK_RULES}`;
 
 const CONTENT_REWRITE_PROMPT = `You are a senior content editor and SEO copywriter.
 
@@ -105,7 +135,8 @@ Analyze the provided content and return a single JSON object with EXACTLY this s
   "changes": [
     { "what": string, "why": string }
   ],
-  "seoImprovements": string[]
+  "seoImprovements": string[],
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
@@ -114,7 +145,8 @@ Rules:
 - improvedTitle: 50-60 chars, scroll-stopping, SEO-friendly, no clickbait.
 - improvedContent: full rewrite using markdown (#, ##, lists). Preserve the core message but with stronger structure, clearer CTAs, and tighter language. Keep under 1500 words.
 - changes: 4-8 entries describing specific, named edits and the reason for each.
-- seoImprovements: bulleted list of SEO upgrades applied (heading hierarchy, internal links, keyword targeting, etc.).`;
+- seoImprovements: bulleted list of SEO upgrades applied (heading hierarchy, internal links, keyword targeting, etc.).
+${CREATIVE_PACK_RULES}`;
 
 const COMPETITIVE_STRATEGY_PROMPT = `You are a senior competitive intelligence strategist.
 
@@ -134,7 +166,8 @@ Analyze the provided content (a competitor's page) and return a single JSON obje
   "uxEvaluation": string,
   "actionPlan": [
     { "priority": "high" | "medium" | "low", "action": string, "expectedImpact": string }
-  ]
+  ],
+${CREATIVE_PACK_SCHEMA}
 }
 
 Rules:
@@ -143,7 +176,79 @@ Rules:
 - messaging.keyThemes: 3-6 dominant themes (e.g., "AI-first workflow", "enterprise-grade security").
 - contentStrategy.gaps: name the OPPORTUNITIES this competitor leaves open — these are how you beat them.
 - uxEvaluation: 2-4 sentences on UX/CRO observations from the page (information architecture, CTA clarity, friction points).
-- actionPlan: 5-8 prioritized recommendations. Each must be specific and actionable, not generic. Flag uncertainty where the page doesn't reveal info (e.g., "pricing not visible — assumed mid-market").`;
+- actionPlan: 5-8 prioritized recommendations. Each must be specific and actionable, not generic. Flag uncertainty where the page doesn't reveal info (e.g., "pricing not visible — assumed mid-market").
+${CREATIVE_PACK_RULES}`;
+
+const BACKLINK_INTEL_PROMPT = `You are a digital PR and backlink intelligence strategist.
+
+Analyze the provided website or brand page as a connection analyst.
+
+Your primary goal is NOT generic SEO. Your primary goal is to reverse-map the brand's owned social channels, account identity, platform footprint, and related media connections from the page content, metadata, and extracted links.
+
+Use any visible social URLs, footer links, profile links, sameAs-style metadata, outbound links, brand mentions, and contact/community references in the source.
+
+When a structured Social Profiles section is present, treat it as the canonical starting point for official account extraction before inferring anything else.
+
+Do NOT use external backlink data APIs. If external attention or media footprint is not directly visible, infer cautiously and label it clearly as inferred.
+
+Return a single JSON object with EXACTLY this shape:
+
+{
+  "brandSummary": string,
+  "officialAccounts": [
+    {
+      "platform": string,
+      "accountName": string,
+      "handle": string,
+      "url": string,
+      "evidence": string
+    }
+  ],
+  "platformPresence": [
+    {
+      "platform": string,
+      "status": "official" | "likely" | "mentioned",
+      "notes": string
+    }
+  ],
+  "connectionAnalysis": {
+    "ownedChannels": string[],
+    "communitySignals": string[],
+    "mediaSignals": string[],
+    "crossPlatformFlow": string
+  },
+  "relatedConnections": [
+    {
+      "name": string,
+      "type": "media" | "community" | "partner" | "directory" | "creator" | "other",
+      "url": string,
+      "whyItMatters": string
+    }
+  ],
+  "distributionOpportunities": [
+    {
+      "platform": string,
+      "opportunity": string,
+      "priority": "high" | "medium" | "low"
+    }
+  ],
+  "creativeAngles": string[],
+${CREATIVE_PACK_SCHEMA}
+}
+
+Rules:
+- Return ONLY the JSON object. No prose before or after.
+- brandSummary: 2-4 sentences summarizing what this brand appears to do and where its strongest social/media footprint is.
+- officialAccounts: list only accounts that are directly evidenced by the source or highly likely from a linked URL. If a field is unknown, use an empty string, not null.
+- platformPresence: include major relevant platforms even if the brand is only mentioned there indirectly.
+- connectionAnalysis.ownedChannels: list the channels directly controlled by the brand.
+- connectionAnalysis.communitySignals: communities, groups, newsletters, or audience hubs linked or implied by the source.
+- connectionAnalysis.mediaSignals: publications, directories, podcasts, or brand-adjacent media touchpoints linked or implied by the source.
+- connectionAnalysis.crossPlatformFlow: explain how the brand appears to move users between website and social channels.
+- relatedConnections: 4-10 relevant connections. Prefer direct evidence; mark inferred reasoning inside whyItMatters when necessary.
+- distributionOpportunities: 4-8 actionable ways a user could mirror or learn from this channel mix.
+- creativeAngles: 3-6 reusable content or outreach angles inspired by this connection map.
+${CREATIVE_PACK_RULES}`;
 
 const LISTING_AUDIT_PROMPT = `You are an Amazon listing optimization expert.
 
@@ -256,6 +361,7 @@ const PROMPTS: Record<AnalysisType, string> = {
   seo_audit: SEO_AUDIT_PROMPT,
   content_rewrite: CONTENT_REWRITE_PROMPT,
   competitive_strategy: COMPETITIVE_STRATEGY_PROMPT,
+  backlink_intel: BACKLINK_INTEL_PROMPT,
   listing_audit: LISTING_AUDIT_PROMPT,
   review_mining: REVIEW_MINING_PROMPT,
   competitor_compare: COMPETITOR_COMPARE_PROMPT,

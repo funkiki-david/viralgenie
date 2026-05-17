@@ -18,6 +18,7 @@ export async function GET(
       status: task.status,
       urlType: task.urlType,
       crawlEngine: task.crawlEngine,
+      errorMsg: task.errorMsg,
       createdAt: task.createdAt,
     });
   }

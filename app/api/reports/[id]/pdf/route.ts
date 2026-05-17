@@ -41,6 +41,12 @@ function asStringArray(v: unknown): string[] {
     : [];
 }
 
+function asObj(v: unknown): AnyObj {
+  return v && typeof v === "object" && !Array.isArray(v)
+    ? (v as AnyObj)
+    : {};
+}
+
 const CJK_RE = /[　-〿一-鿿＀-￯]/;
 
 function reportContainsCJK(report: unknown): boolean {
@@ -183,6 +189,87 @@ function buildPdf(args: {
     });
   };
 
+  const creativePackSection = (raw: unknown) => {
+    const pack = asObj(raw);
+    const imagePrompts = asObj(pack.imagePrompts);
+    const midjourney = asString(imagePrompts.midjourney);
+    const dalle = asString(imagePrompts.dalle);
+    const videoScript = asString(pack.videoScript15s);
+    const shotPrompts = asStringArray(pack.shotPrompts);
+    const readyToPostCopy = asStringArray(pack.readyToPostCopy);
+    const hookOptions = asStringArray(pack.hookOptions);
+    const outreachCopy = asStringArray(pack.outreachCopy);
+    if (
+      !midjourney &&
+      !dalle &&
+      !videoScript &&
+      shotPrompts.length === 0 &&
+      readyToPostCopy.length === 0 &&
+      hookOptions.length === 0 &&
+      outreachCopy.length === 0
+    ) {
+      return;
+    }
+    sectionTitle("Creator Pack");
+    if (midjourney || dalle) {
+      paragraphSection("Image Prompt - Midjourney", midjourney);
+      paragraphSection("Image Prompt - DALL-E", dalle);
+    }
+    if (videoScript) paragraphSection("15s Video Script", videoScript);
+    if (shotPrompts.length > 0) listSection("Shot Prompts", shotPrompts, true);
+    if (hookOptions.length > 0) listSection("Hook Options", hookOptions, true);
+    if (readyToPostCopy.length > 0) {
+      listSection("Ready-to-post Copy", readyToPostCopy, true);
+    }
+    if (outreachCopy.length > 0) {
+      listSection("Outreach Copy", outreachCopy, true);
+    }
+  };
+
+  const launchPageSection = (raw: unknown) => {
+    const page = asObj(raw);
+    const title = asString(page.title);
+    if (!title) return;
+
+    sectionTitle("Launch Page");
+    paragraphSection("Title", title);
+    paragraphSection("Subtitle", asString(page.subtitle));
+    paragraphSection("Hero CTA", asString(page.heroCta));
+
+    const sections = Array.isArray(page.sections) ? page.sections : [];
+    if (sections.length > 0) {
+      sectionTitle("Page Sections");
+      sections.forEach((rawSection, i) => {
+        const item = asObj(rawSection);
+        writeLines(
+          `${i + 1}. ${asString(item.title) || `Section ${i + 1}`}`,
+          11,
+          "bold",
+        );
+        writeLines(asString(item.body) || "-", 10);
+        y += 4;
+      });
+    }
+
+    const socialLinks = Array.isArray(page.socialLinks)
+      ? page.socialLinks
+      : [];
+    if (socialLinks.length > 0) {
+      sectionTitle("Social Links");
+      socialLinks.forEach((rawLink, i) => {
+        const link = asObj(rawLink);
+        writeLines(
+          `${i + 1}. ${asString(link.platform) || "-"} - ${asString(link.label) || "-"}`,
+          10,
+        );
+        writeLines(`URL: ${asString(link.url) || "-"}`, 10);
+      });
+    }
+
+    paragraphSection("Visual Direction", asString(page.visualDirection));
+    listSection("Outreach Copy", asStringArray(page.outreachCopy), true);
+  };
+
   // Page 1
   drawHeader();
 
@@ -263,10 +350,79 @@ function buildPdf(args: {
         writeLines(`Why it works: ${why}`, 10, "italic", [110, 110, 110]);
       }
     });
+  } else if (type === "backlink_intel") {
+    const connectionAnalysis = asObj(report.connectionAnalysis);
+    paragraphSection("Brand Summary", asString(report.brandSummary));
+    const featured = Array.isArray(report.officialAccounts)
+      ? report.officialAccounts
+      : [];
+    if (featured.length > 0) {
+      sectionTitle("Official Accounts");
+      featured.forEach((raw, i) => {
+        const source = asObj(raw);
+        writeLines(
+          `${i + 1}. ${asString(source.accountName) || "-"} (${asString(source.platform) || "-"})`,
+          11,
+          "bold",
+        );
+        writeLines(`Handle: ${asString(source.handle) || "-"}`, 10);
+        writeLines(`URL: ${asString(source.url) || "-"}`, 10);
+        writeLines(
+          `Evidence: ${asString(source.evidence) || "-"}`,
+          10,
+          "italic",
+          [110, 110, 110],
+        );
+        y += 4;
+      });
+    }
+    listSection(
+      "Owned Channels",
+      asStringArray(connectionAnalysis.ownedChannels),
+      true,
+    );
+    listSection(
+      "Community Signals",
+      asStringArray(connectionAnalysis.communitySignals),
+      true,
+    );
+    listSection(
+      "Media Signals",
+      asStringArray(connectionAnalysis.mediaSignals),
+      true,
+    );
+    paragraphSection(
+      "Cross-platform Flow",
+      asString(connectionAnalysis.crossPlatformFlow),
+    );
+    const opportunities = Array.isArray(report.distributionOpportunities)
+      ? report.distributionOpportunities
+      : [];
+    if (opportunities.length > 0) {
+      sectionTitle("Distribution Opportunities");
+      opportunities.forEach((raw, i) => {
+        const item = asObj(raw);
+        writeLines(
+          `${i + 1}. ${asString(item.platform) || "-"} [${asString(item.priority) || "medium"}]`,
+          11,
+          "bold",
+        );
+        writeLines(asString(item.opportunity) || "-", 10);
+        y += 4;
+      });
+    }
+    listSection("Creative Angles", asStringArray(report.creativeAngles), true);
   } else {
     sectionTitle("Report");
     writeLines(JSON.stringify(report, null, 2), 9, "normal");
   }
+
+  creativePackSection(
+    asObj(report.studio).creativePack ?? report.creatorPack ?? report.creativePack,
+  );
+  launchPageSection(
+    asObj(report.studio).launchPage ?? report.launchPage ?? report.micrositeDraft,
+  );
 
   drawFooter();
 

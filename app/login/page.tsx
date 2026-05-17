@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 
 type Lang = "zh" | "en";
@@ -113,7 +114,7 @@ function LangToggle({
 }
 
 export default function LoginPage() {
-  // Default to "en" for SSR consistency; resolve browser/cached pref on mount.
+  // Default to "en" for SSR consistency; resolve browser language on mount.
   const [lang, setLang] = useState<Lang>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -123,13 +124,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Priority: cached preference > browser locale > "en"
-    const saved = localStorage.getItem("viralgenie_lang") as Lang | null;
-    if (saved === "zh" || saved === "en") {
-      setLang(saved);
-    } else {
-      setLang(detectBrowserLang());
-    }
+    queueMicrotask(() => setLang(detectBrowserLang()));
     emailRef.current?.focus();
   }, []);
 
@@ -175,7 +170,7 @@ export default function LoginPage() {
         <LangToggle lang={lang} setLang={setLang} />
       </div>
       <div className="w-full max-w-sm">
-        <a
+        <Link
           href="/"
           aria-label={t.title}
           className="flex flex-col items-center text-center mb-8 -mx-2 px-2 py-2 rounded-lg hover:opacity-90 transition-opacity"
@@ -194,7 +189,7 @@ export default function LoginPage() {
             {t.subtitle}
           </p>
           <p className="mt-4 text-sm text-zinc-600">{t.tagline}</p>
-        </a>
+        </Link>
         <div className="rounded-2xl bg-white border border-zinc-200 shadow-xl p-6 space-y-3">
           <div>
             <label

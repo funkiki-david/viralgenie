@@ -2,7 +2,14 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
 import { checkLimit, type Service } from "@/src/lib/cost-guard";
 
-const SERVICES: Service[] = ["supadata", "firecrawl", "apify", "claude"];
+const SERVICES: Service[] = [
+  "tikhub",
+  "rnote",
+  "supadata",
+  "firecrawl",
+  "apify",
+  "claude",
+];
 
 export async function GET() {
   const session = await getServerSession(authOptions);
