@@ -1465,6 +1465,16 @@ function progressReassurance(lang: Lang): string {
     : "You can leave this page and reopen the run later from Library.";
 }
 
+function compactDisplayTitle(value: string, fallback: string): string {
+  const source = value.trim();
+  if (!source) return fallback;
+  const firstLine = source.split(/\n+/).find(Boolean)?.trim() ?? source;
+  const firstSentence = firstLine.split(/(?<=[.!?])\s+/)[0]?.trim() ?? firstLine;
+  const collapsed = firstSentence.replace(/\s+/g, " ");
+  if (collapsed.length <= 96) return collapsed;
+  return `${collapsed.slice(0, 93).trimEnd()}...`;
+}
+
 function readSocialProfilesFromRawData(rawData: unknown): SocialProfileRecord[] {
   const metadata = asObject(asObject(rawData).metadata);
   const value = metadata.socialProfiles;
@@ -1839,21 +1849,122 @@ function PriorityResultsView({
     hasImagePrompt ||
     hasVideo;
 
-  const list = (items?: string[]) =>
-    items && items.length > 0 ? (
-      <ul className="list-disc pl-5 space-y-2">
-        {items.map((item, index) => (
-          <li key={`${item}-${index}`} className="whitespace-pre-wrap">
-            {item}
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p>—</p>
-    );
-
   if (!hasAny) {
     return <StudioOutputOverview task={task} lang={lang} />;
+  }
+
+  const cards: React.ReactNode[] = [];
+
+  if (creativeAngles.length > 0) {
+    cards.push(
+      <ReportCard
+        key="creative-angles"
+        title={s.creativeAngles}
+        icon="🎯"
+        accent="amber"
+        leftAccent="purple"
+        highlighted
+      >
+        <ul className="list-disc pl-5 space-y-2">
+          {creativeAngles.map((item, index) => (
+            <li key={`${item}-${index}`} className="whitespace-pre-wrap">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </ReportCard>,
+    );
+  }
+
+  if (relatedLinks.length > 0) {
+    cards.push(
+      <ReportCard
+        key="related-connections"
+        title={s.relatedConnections}
+        icon="🔗"
+        accent="emerald"
+        leftAccent="teal"
+      >
+        <ul className="space-y-3">
+          {relatedLinks.map((item, index) => (
+            <li key={`${item.url ?? item.name ?? "link"}-${index}`}>
+              <div className="font-semibold text-zinc-900">
+                {item.name ?? item.url ?? "Related link"}
+              </div>
+              <p className="text-sm text-zinc-600 break-all">
+                {item.url ?? "—"}
+              </p>
+              {item.whyItMatters && (
+                <p className="mt-1 text-xs leading-5 text-emerald-700">
+                  {item.whyItMatters}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </ReportCard>,
+    );
+  }
+
+  if (hasImagePrompt) {
+    cards.push(
+      <ReportCard
+        key="image-prompts"
+        title={s.imagePrompts}
+        icon="🖼️"
+        accent="purple"
+        leftAccent="indigo"
+      >
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-1">
+              {s.midjourney}
+            </p>
+            <p className="whitespace-pre-wrap">
+              {pack?.imagePrompts?.midjourney ?? "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-1">
+              {s.dalle}
+            </p>
+            <p className="whitespace-pre-wrap">
+              {pack?.imagePrompts?.dalle ?? "—"}
+            </p>
+          </div>
+        </div>
+      </ReportCard>,
+    );
+  }
+
+  if (hasVideo) {
+    cards.push(
+      <ReportCard
+        key="video-script"
+        title={s.videoScript15s}
+        icon="🎥"
+        accent="sky"
+        leftAccent="sky"
+      >
+        <p className="whitespace-pre-wrap mb-4">
+          {pack?.videoScript15s ?? "—"}
+        </p>
+        <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-2">
+          {s.shotPrompts}
+        </p>
+        {pack?.shotPrompts && pack.shotPrompts.length > 0 ? (
+          <ul className="list-disc pl-5 space-y-2">
+            {pack.shotPrompts.map((item, index) => (
+              <li key={`${item}-${index}`} className="whitespace-pre-wrap">
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>—</p>
+        )}
+      </ReportCard>,
+    );
   }
 
   return (
@@ -1870,179 +1981,8 @@ function PriorityResultsView({
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ReportCard
-          title={s.creativeAngles}
-          icon="🎯"
-          accent="amber"
-          leftAccent="purple"
-          highlighted
-        >
-          {list(creativeAngles)}
-        </ReportCard>
-
-        <ReportCard title={s.relatedConnections} icon="🔗" accent="emerald" leftAccent="teal">
-          {relatedLinks.length > 0 ? (
-            <ul className="space-y-3">
-              {relatedLinks.map((item, index) => (
-                <li key={`${item.url ?? item.name ?? "link"}-${index}`}>
-                  <div className="font-semibold text-zinc-900">
-                    {item.name ?? item.url ?? "Related link"}
-                  </div>
-                  <p className="text-sm text-zinc-600 break-all">
-                    {item.url ?? "—"}
-                  </p>
-                  {item.whyItMatters && (
-                    <p className="mt-1 text-xs leading-5 text-emerald-700">
-                      {item.whyItMatters}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>—</p>
-          )}
-        </ReportCard>
-
-        <ReportCard title={s.imagePrompts} icon="🖼️" accent="purple" leftAccent="indigo">
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-1">
-                {s.midjourney}
-              </p>
-              <p className="whitespace-pre-wrap">
-                {pack?.imagePrompts?.midjourney ?? "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-1">
-                {s.dalle}
-              </p>
-              <p className="whitespace-pre-wrap">
-                {pack?.imagePrompts?.dalle ?? "—"}
-              </p>
-            </div>
-          </div>
-        </ReportCard>
-
-        <ReportCard title={s.videoScript15s} icon="🎥" accent="sky" leftAccent="sky">
-          <p className="whitespace-pre-wrap mb-4">
-            {pack?.videoScript15s ?? "—"}
-          </p>
-          <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-2">
-            {s.shotPrompts}
-          </p>
-          {list(pack?.shotPrompts)}
-        </ReportCard>
-      </div>
+      <div className="grid gap-4 md:grid-cols-2">{cards}</div>
     </section>
-  );
-}
-
-function ProviderTraceView({
-  task,
-  lang,
-}: {
-  task: Task;
-  lang: Lang;
-}) {
-  const trace = readProviderTrace(task);
-  if (!trace) return null;
-
-  const attempts = Array.isArray(trace.attempts) ? trace.attempts : [];
-  const title = lang === "zh" ? "Provider Path" : "Provider Path";
-  const helper =
-    lang === "zh"
-      ? "这次分析先走哪条抓取链路、是否回退，以及每一步耗时。"
-      : "Which provider path this run used, whether it fell back, and how long each step took.";
-  const summaryBits = [
-    trace.primaryEngine
-      ? lang === "zh"
-        ? `主引擎 ${trace.primaryEngine}`
-        : `Primary ${trace.primaryEngine}`
-      : "",
-    trace.finalEngine
-      ? lang === "zh"
-        ? `最终 ${trace.finalEngine}`
-        : `Final ${trace.finalEngine}`
-      : "",
-    trace.cached
-      ? lang === "zh"
-        ? "使用缓存"
-        : "Cache hit"
-      : "",
-    trace.fallbackUsed
-      ? lang === "zh"
-        ? "已启用 fallback"
-        : "Fallback used"
-      : "",
-  ].filter(Boolean);
-
-  return (
-    <ReportCard title={title} icon="🧭" accent="emerald" leftAccent="green">
-      <p className="mb-3 text-sm text-zinc-600">{helper}</p>
-      {summaryBits.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {summaryBits.map((item) => (
-            <span
-              key={item}
-              className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700"
-            >
-              {item}
-            </span>
-          ))}
-        </div>
-      )}
-      {attempts.length > 0 ? (
-        <ul className="space-y-3">
-          {attempts.map((attempt, index) => {
-            const statusTone =
-              attempt.status === "success"
-                ? "text-emerald-700"
-                : attempt.status === "skipped"
-                  ? "text-amber-700"
-                  : "text-rose-700";
-            const duration =
-              typeof attempt.durationMs === "number"
-                ? `${(attempt.durationMs / 1000).toFixed(attempt.durationMs >= 10000 ? 0 : 1)}s`
-                : null;
-            return (
-              <li
-                key={`${attempt.engine ?? "engine"}-${index}`}
-                className="rounded-xl border border-zinc-200 bg-white/80 px-4 py-3"
-              >
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-semibold text-zinc-900">
-                    {attempt.engine ?? "unknown"}
-                  </span>
-                  {attempt.role && (
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
-                      {attempt.role}
-                    </span>
-                  )}
-                  {attempt.status && (
-                    <span className={`text-xs font-semibold uppercase ${statusTone}`}>
-                      {attempt.status}
-                    </span>
-                  )}
-                  {duration && (
-                    <span className="text-xs text-zinc-500">{duration}</span>
-                  )}
-                </div>
-                {attempt.reason && (
-                  <p className="mt-2 text-sm leading-6 text-zinc-600">
-                    {attempt.reason}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="text-sm text-zinc-600">—</p>
-      )}
-    </ReportCard>
   );
 }
 
@@ -2080,7 +2020,6 @@ function FullReportDetails({
         </div>
       </summary>
       <div className="mt-5 space-y-6">
-        <ProviderTraceView task={task} lang={lang} />
         <ReportRenderer task={task} lang={lang} compact={compact} includeCreativePack={false} />
         <MicrositeDraftView task={task} lang={lang} />
       </div>
@@ -2097,25 +2036,33 @@ function MicrositeDraftView({
 }) {
   const draft = resolvedLaunchPage(task, lang);
   const s = i18n[lang].sections;
+  const sectionTitle =
+    lang === "zh" ? "Page Draft" : "Page Draft";
+  const badgeTitle =
+    lang === "zh" ? "OUTREACH DRAFT" : "OUTREACH DRAFT";
+  const displayTitle = compactDisplayTitle(
+    draft.title ?? "",
+    lang === "zh" ? "用于分享和外联的页面草稿" : "A page draft for outreach and sharing",
+  );
   return (
     <div className="mt-6">
       <h3
-        className="text-lg font-bold text-zinc-900 mb-3"
+        className="text-base font-semibold text-zinc-900 mb-3"
         style={{ fontFamily: "var(--font-sora)" }}
       >
-        {i18n[lang].workspace.microsite.label}
+        {sectionTitle}
       </h3>
       <div className="rounded-[28px] border border-zinc-200 bg-white p-6 shadow-sm">
         <div className="rounded-[24px] border border-zinc-200 bg-gradient-to-br from-zinc-50 via-white to-emerald-50/40 p-6">
           <div className="max-w-2xl">
             <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-              Launch Page
+              {badgeTitle}
             </span>
             <h4
-              className="mt-4 text-3xl font-bold leading-tight text-zinc-950"
+              className="mt-4 text-xl font-bold leading-tight text-zinc-950 md:text-2xl"
               style={{ fontFamily: "var(--font-sora)" }}
             >
-              {draft.title}
+              {displayTitle}
             </h4>
             <p className="mt-3 text-sm leading-7 text-zinc-600 md:text-base">
               {draft.subtitle}

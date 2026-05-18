@@ -369,6 +369,16 @@ function section(title: string, body: string): LaunchPageSection | null {
   return { title, body: cleanBody };
 }
 
+function compactHeadline(value: string, fallback: string): string {
+  const source = value.trim();
+  if (!source) return fallback;
+  const firstLine = source.split(/\n+/).find(Boolean)?.trim() ?? source;
+  const firstSentence = firstLine.split(/(?<=[.!?])\s+/)[0]?.trim() ?? firstLine;
+  const collapsed = firstSentence.replace(/\s+/g, " ");
+  if (collapsed.length <= 90) return collapsed;
+  return `${collapsed.slice(0, 87).trimEnd()}...`;
+}
+
 export function buildSignalMap(args: {
   rawReport: Record<string, unknown>;
   content: UnifiedContent;
@@ -491,7 +501,10 @@ function buildLaunchPage(args: {
     "Clean social proof layout with a strong headline, channel signals, and outreach-ready calls to action.";
 
   return {
-    title: titleCandidates[0] || `${analysisType} Launch Page`,
+    title: compactHeadline(
+      titleCandidates[0] || "",
+      `${analysisType} page draft`,
+    ),
     subtitle: `A lightweight landing-page draft generated from ${content.platform} source analysis.`,
     heroCta: "Launch outreach from this angle",
     sections,
