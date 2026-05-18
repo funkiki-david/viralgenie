@@ -416,16 +416,21 @@ export function resolveAnalysisType(args: {
 }): AnalysisType {
   if (args.analysisType) return args.analysisType;
 
+  const videoCreativePlatform =
+    args.platform === "youtube" ||
+    args.platform === "tiktok" ||
+    args.platform === "instagram" ||
+    args.platform === "douyin" ||
+    args.platform === "bilibili" ||
+    args.platform === "xiaohongshu" ||
+    args.platform === "x";
+
   if (args.workspace === "creative") {
-    return args.platform === "youtube" || args.platform === "tiktok" || args.platform === "x"
-      ? "viral_rewrite"
-      : "content_rewrite";
+    return videoCreativePlatform ? "viral_rewrite" : "content_rewrite";
   }
 
   if (args.workspace === "microsite") {
-    return args.platform === "youtube" || args.platform === "tiktok" || args.platform === "x"
-      ? "script_teardown"
-      : "content_rewrite";
+    return videoCreativePlatform ? "script_teardown" : "content_rewrite";
   }
 
   return "backlink_intel";

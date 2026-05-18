@@ -317,6 +317,12 @@ interface ResultIntent {
   icon: string;
 }
 
+interface DemoUrl {
+  id: "tiktok" | "youtube" | "instagram";
+  platform: Platform;
+  url: string;
+}
+
 const RESULT_INTENTS: ResultIntent[] = [
   {
     id: "whyViral",
@@ -356,6 +362,24 @@ const RESULT_INTENTS: ResultIntent[] = [
   },
 ];
 
+const DEMO_URLS: DemoUrl[] = [
+  {
+    id: "tiktok",
+    platform: "tiktok",
+    url: "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+  },
+  {
+    id: "youtube",
+    platform: "youtube",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  },
+  {
+    id: "instagram",
+    platform: "instagram",
+    url: "https://www.instagram.com/reel/DUa5b_BDmmD/",
+  },
+];
+
 // ============================================================================
 // i18n dictionary
 // ============================================================================
@@ -377,8 +401,10 @@ const baseI18n = {
         "Turn one viral URL into your next winning post.",
       heroBody:
         "Paste any TikTok, YouTube, or Instagram URL. ViralGenie breaks down why a competitor's content worked, then rebuilds that logic into fresh scripts, captions, and image prompts for your brand.",
+      demoHeading: "Start with a live TikTok demo, or test YouTube and Instagram next.",
+      demoLabel: "Recommended demo URLs",
       sampleIdeas: [
-        "TikTok video URL",
+        "TikTok demo video URL",
         "YouTube Short or video",
         "Instagram Reel or post",
       ],
@@ -662,8 +688,10 @@ const baseI18n = {
         "把一个爆款 URL 变成你的下一条爆款内容。",
       heroBody:
         "粘贴任意 TikTok、YouTube 或 Instagram 链接。ViralGenie 会拆解竞争对手的内容为什么会火，再把这套爆款逻辑重组成适合你品牌的新脚本、文案和图片提示词。",
+      demoHeading: "先试跑一条 TikTok 真实示例，再测试 YouTube 和 Instagram。",
+      demoLabel: "推荐测试链接",
       sampleIdeas: [
-        "TikTok 视频链接",
+        "TikTok 示例视频链接",
         "YouTube Shorts 或视频",
         "Instagram Reels 或帖子",
       ],
@@ -3318,6 +3346,42 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
               ) : (
                 <span className="text-zinc-400">{t.analyze.noDetection}</span>
               )}
+            </div>
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-white px-4 py-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p
+                    className="text-sm font-semibold text-zinc-900"
+                    style={{ fontFamily: "var(--font-sora)" }}
+                  >
+                    {t.analyze.demoLabel}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    {t.analyze.demoHeading}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {DEMO_URLS.map((demo) => {
+                    const active = url === demo.url;
+                    return (
+                      <button
+                        key={demo.id}
+                        type="button"
+                        onClick={() => setUrl(demo.url)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                          active
+                            ? "border-purple-300 bg-purple-50 text-purple-700"
+                            : demo.id === "tiktok"
+                              ? "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800"
+                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                        }`}
+                      >
+                        {t.platforms[demo.platform]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="mt-4 flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex items-center gap-2">
