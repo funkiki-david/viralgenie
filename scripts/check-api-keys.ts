@@ -15,6 +15,11 @@ interface CheckResult {
   detail: string;
 }
 
+interface SupadataProbe {
+  name: string;
+  url: string;
+}
+
 const args = new Set(process.argv.slice(2));
 const live = args.has("--live");
 const includePaid = args.has("--include-paid");
@@ -146,12 +151,70 @@ async function checkSupadata(): Promise<CheckResult> {
     );
   }
 
+  const probes: SupadataProbe[] = [
+    {
+      name: "youtube",
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    },
+    {
+      name: "tiktok",
+      url: "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+    },
+  ];
+
   try {
     const client = new Supadata({ apiKey: key });
-    await withTimeout(20000, () =>
-      client.metadata({ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }),
+    const details: string[] = [];
+    let youtubeHealthy = false;
+
+    for (const probe of probes) {
+      const startedAt = Date.now();
+      try {
+        await withTimeout(20000, () => client.metadata({ url: probe.url }));
+        details.push(`${probe.name}: ok (${Date.now() - startedAt}ms)`);
+        if (probe.name === "youtube") youtubeHealthy = true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const lower = message.toLowerCase();
+        if (probe.name === "youtube") {
+          return result("SUPADATA_API_KEY", "fail", `youtube probe failed: ${message}`);
+        }
+        if (
+          lower.includes("limit exceeded") ||
+          lower.includes("limit-exceeded") ||
+          lower.includes("rate limit")
+        ) {
+          details.push(`${probe.name}: plan limit (${Date.now() - startedAt}ms)`);
+          continue;
+        }
+        if (lower.includes("timed out")) {
+          details.push(`${probe.name}: timeout (${Date.now() - startedAt}ms)`);
+          continue;
+        }
+        details.push(`${probe.name}: error (${message})`);
+      }
+    }
+
+    if (!youtubeHealthy) {
+      return result(
+        "SUPADATA_API_KEY",
+        "fail",
+        "youtube probe did not succeed",
+      );
+    }
+
+    const degraded = details.some(
+      (detail) =>
+        detail.includes("plan limit") ||
+        detail.includes("timeout") ||
+        detail.includes("error"),
     );
-    return result("SUPADATA_API_KEY", "pass", "Supadata metadata request succeeded");
+
+    return result(
+      "SUPADATA_API_KEY",
+      degraded ? "warn" : "pass",
+      details.join("; "),
+    );
   } catch (err) {
     return result(
       "SUPADATA_API_KEY",

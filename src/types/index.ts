@@ -61,6 +61,23 @@ export interface UnifiedContent {
   metadata: Record<string, unknown>;
 }
 
+export interface ProviderAttempt {
+  engine: CrawlEngine;
+  role: "primary" | "fallback" | "cache";
+  status: "success" | "failed" | "skipped";
+  durationMs?: number;
+  reason?: string;
+}
+
+export interface ProviderTrace {
+  primaryEngine: CrawlEngine;
+  finalEngine: CrawlEngine;
+  platform: Platform;
+  cached: boolean;
+  fallbackUsed: boolean;
+  attempts: ProviderAttempt[];
+}
+
 export interface AmazonProductData {
   asin: string;
   marketplace: string;
@@ -207,6 +224,7 @@ export interface StudioReport {
     platform: Platform;
     title: string;
   };
+  providerTrace?: ProviderTrace;
   connections: StudioSection;
   signalMap?: SignalMapReport;
   creativePack: CreatorPackReport;

@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx scripts/run-next-dev.ts",
     "build": "prisma generate &&next build",
     "start": "next start",
     "lint": "eslint",
     "add-user": "tsx scripts/add-user.ts",
     "migrate-admin": "tsx scripts/migrate-admin.ts",
-    "check-api-keys": "tsx scripts/check-api-keys.ts"
+    "check-api-keys": "tsx scripts/check-api-keys.ts",
+    "smoke:prod": "tsx scripts/smoke-prod.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

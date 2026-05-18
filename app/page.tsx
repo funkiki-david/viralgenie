@@ -32,6 +32,8 @@ type Platform =
   | "other";
 type Engine = "tikhub" | "rnote" | "supadata" | "firecrawl" | "apify";
 type TaskStatus = "pending" | "crawling" | "analyzing" | "done" | "failed";
+type ProviderAttemptRole = "primary" | "fallback" | "cache";
+type ProviderAttemptStatus = "success" | "failed" | "skipped";
 
 interface Task {
   id: string;
@@ -46,6 +48,23 @@ interface Task {
   rawData?: unknown;
   normalized?: string | null;
   report?: Record<string, unknown> | null;
+}
+
+interface ProviderAttemptRecord {
+  engine?: string;
+  role?: ProviderAttemptRole;
+  status?: ProviderAttemptStatus;
+  durationMs?: number;
+  reason?: string;
+}
+
+interface ProviderTraceRecord {
+  primaryEngine?: string;
+  finalEngine?: string;
+  platform?: string;
+  cached?: boolean;
+  fallbackUsed?: boolean;
+  attempts?: ProviderAttemptRecord[];
 }
 
 interface UsageEntry {
@@ -275,6 +294,7 @@ interface LaunchPagePanel {
 interface StudioEnvelope {
   version?: number;
   workspace?: Workspace;
+  providerTrace?: ProviderTraceRecord;
   connections?: StudioSection;
   signalMap?: SignalMapPanel;
   creativePack?: CreativePack;
@@ -1368,6 +1388,55 @@ function asObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function readProviderTrace(task: Task): ProviderTraceRecord | null {
+  const report = asObject(task.report);
+  const studio = asObject(report.studio);
+  const rawData = asObject(task.rawData);
+  const metadata = asObject(rawData.metadata);
+  const trace =
+    studio.providerTrace ?? report.providerTrace ?? metadata.providerTrace;
+  return trace && typeof trace === "object" && !Array.isArray(trace)
+    ? (trace as ProviderTraceRecord)
+    : null;
+}
+
+function formatElapsed(createdAt: string, lang: Lang): string {
+  const startedAt = new Date(createdAt).getTime();
+  if (Number.isNaN(startedAt)) return "";
+  const totalSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (lang === "zh") {
+    return minutes > 0 ? `${minutes} 分 ${seconds} 秒` : `${seconds} 秒`;
+  }
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function progressHint(status: TaskStatus, lang: Lang): string {
+  if (lang === "zh") {
+    if (status === "crawling") {
+      return "正在抓取页面与社媒连接，通常需要几十秒。";
+    }
+    if (status === "analyzing") {
+      return "正在整理账号、连接关系和创作资产，完整官网分析通常需要 1 到 2 分钟。";
+    }
+    return "你也可以稍后从 Library 回来看结果。";
+  }
+  if (status === "crawling") {
+    return "We are pulling the page and its social connection signals now. This usually takes a few seconds.";
+  }
+  if (status === "analyzing") {
+    return "We are organizing accounts, relationships, and creator assets now. Full website analysis often takes 1 to 2 minutes.";
+  }
+  return "You can reopen this anytime from Library.";
+}
+
+function progressReassurance(lang: Lang): string {
+  return lang === "zh"
+    ? "你可以离开这个页面，稍后在 Library 里继续查看。"
+    : "You can leave this page and reopen the run later from Library.";
+}
+
 function readSocialProfilesFromRawData(rawData: unknown): SocialProfileRecord[] {
   const metadata = asObject(asObject(rawData).metadata);
   const value = metadata.socialProfiles;
@@ -1843,6 +1912,112 @@ function PriorityResultsView({
   );
 }
 
+function ProviderTraceView({
+  task,
+  lang,
+}: {
+  task: Task;
+  lang: Lang;
+}) {
+  const trace = readProviderTrace(task);
+  if (!trace) return null;
+
+  const attempts = Array.isArray(trace.attempts) ? trace.attempts : [];
+  const title = lang === "zh" ? "Provider Path" : "Provider Path";
+  const helper =
+    lang === "zh"
+      ? "这次分析先走哪条抓取链路、是否回退，以及每一步耗时。"
+      : "Which provider path this run used, whether it fell back, and how long each step took.";
+  const summaryBits = [
+    trace.primaryEngine
+      ? lang === "zh"
+        ? `主引擎 ${trace.primaryEngine}`
+        : `Primary ${trace.primaryEngine}`
+      : "",
+    trace.finalEngine
+      ? lang === "zh"
+        ? `最终 ${trace.finalEngine}`
+        : `Final ${trace.finalEngine}`
+      : "",
+    trace.cached
+      ? lang === "zh"
+        ? "使用缓存"
+        : "Cache hit"
+      : "",
+    trace.fallbackUsed
+      ? lang === "zh"
+        ? "已启用 fallback"
+        : "Fallback used"
+      : "",
+  ].filter(Boolean);
+
+  return (
+    <ReportCard title={title} icon="🧭" accent="emerald" leftAccent="green">
+      <p className="mb-3 text-sm text-zinc-600">{helper}</p>
+      {summaryBits.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {summaryBits.map((item) => (
+            <span
+              key={item}
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+      {attempts.length > 0 ? (
+        <ul className="space-y-3">
+          {attempts.map((attempt, index) => {
+            const statusTone =
+              attempt.status === "success"
+                ? "text-emerald-700"
+                : attempt.status === "skipped"
+                  ? "text-amber-700"
+                  : "text-rose-700";
+            const duration =
+              typeof attempt.durationMs === "number"
+                ? `${(attempt.durationMs / 1000).toFixed(attempt.durationMs >= 10000 ? 0 : 1)}s`
+                : null;
+            return (
+              <li
+                key={`${attempt.engine ?? "engine"}-${index}`}
+                className="rounded-xl border border-zinc-200 bg-white/80 px-4 py-3"
+              >
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold text-zinc-900">
+                    {attempt.engine ?? "unknown"}
+                  </span>
+                  {attempt.role && (
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                      {attempt.role}
+                    </span>
+                  )}
+                  {attempt.status && (
+                    <span className={`text-xs font-semibold uppercase ${statusTone}`}>
+                      {attempt.status}
+                    </span>
+                  )}
+                  {duration && (
+                    <span className="text-xs text-zinc-500">{duration}</span>
+                  )}
+                </div>
+                {attempt.reason && (
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {attempt.reason}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-sm text-zinc-600">—</p>
+      )}
+    </ReportCard>
+  );
+}
+
 function FullReportDetails({
   task,
   lang,
@@ -1877,6 +2052,7 @@ function FullReportDetails({
         </div>
       </summary>
       <div className="mt-5 space-y-6">
+        <ProviderTraceView task={task} lang={lang} />
         <ReportRenderer task={task} lang={lang} compact={compact} includeCreativePack={false} />
         <MicrositeDraftView task={task} lang={lang} />
       </div>
@@ -2893,6 +3069,7 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
   const [submitting, setSubmitting] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedTick, setElapsedTick] = useState(0);
 
   const detected = url.trim() ? detectPlatform(url) : null;
 
@@ -2936,6 +3113,14 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
         // swallow transient errors; keep polling
       }
     }, 2000);
+    return () => clearInterval(intervalId);
+  }, [task]);
+
+  useEffect(() => {
+    if (!task || task.status === "done" || task.status === "failed") return;
+    const intervalId = setInterval(() => {
+      setElapsedTick((value) => value + 1);
+    }, 1000);
     return () => clearInterval(intervalId);
   }, [task]);
 
@@ -3030,6 +3215,8 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
   }
 
   if (task) {
+    const elapsedLabel = formatElapsed(task.createdAt, lang);
+    const trace = readProviderTrace(task);
     return (
       <div className="space-y-6">
         <h2
@@ -3043,6 +3230,50 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
             status={task.status}
             lang={lang}
           />
+          <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-900">
+                <span>{task.status === "crawling" ? "01" : "02"}</span>
+                <span>
+                  {progressHint(task.status, lang)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                {progressReassurance(lang)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                {lang === "zh" ? "Live status" : "Live status"}
+              </div>
+              <div className="mt-2 space-y-2 text-sm text-zinc-700">
+                <div className="flex items-center justify-between gap-3">
+                  <span>{lang === "zh" ? "已用时间" : "Elapsed"}</span>
+                  <span className="font-semibold text-zinc-900">
+                    {elapsedTick >= 0 ? elapsedLabel || "—" : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>{lang === "zh" ? "当前引擎" : "Current engine"}</span>
+                  <span className="font-semibold text-zinc-900">
+                    {trace?.finalEngine ?? task.crawlEngine ?? "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>{lang === "zh" ? "Fallback" : "Fallback"}</span>
+                  <span className="font-semibold text-zinc-900">
+                    {trace?.fallbackUsed
+                      ? lang === "zh"
+                        ? "已启用"
+                        : "Used"
+                      : lang === "zh"
+                        ? "未启用"
+                        : "Not used"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm flex flex-wrap items-center gap-3">
           <span
@@ -3269,14 +3500,34 @@ function HistoryTab({ lang }: { lang: Lang }) {
       return;
     }
     let alive = true;
-    fetch(`/api/analyze/${selectedId}/status`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (alive && d.task) setSelectedTask(d.task);
-      })
-      .catch(() => {});
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const syncTask = async () => {
+      try {
+        const r = await fetch(`/api/analyze/${selectedId}/status`);
+        const d = await r.json();
+        if (!alive || !d.task) return;
+        const nextTask = d.task as Task;
+        setSelectedTask(nextTask);
+        setTasks((prev) =>
+          prev
+            ? prev.map((task) => (task.id === nextTask.id ? nextTask : task))
+            : prev,
+        );
+        if (
+          intervalId &&
+          (nextTask.status === "done" || nextTask.status === "failed")
+        ) {
+          clearInterval(intervalId);
+        }
+      } catch {
+        // keep detail view stable through transient request errors
+      }
+    };
+    void syncTask();
+    intervalId = setInterval(syncTask, 2000);
     return () => {
       alive = false;
+      if (intervalId) clearInterval(intervalId);
     };
   }, [selectedId]);
 
@@ -3292,7 +3543,11 @@ function HistoryTab({ lang }: { lang: Lang }) {
     });
   }, [tasks, query, platformFilter]);
 
-  if (selectedTask && selectedTask.status === "done") {
+  if (selectedTask) {
+    const inProgress =
+      selectedTask.status === "pending" ||
+      selectedTask.status === "crawling" ||
+      selectedTask.status === "analyzing";
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -3305,16 +3560,66 @@ function HistoryTab({ lang }: { lang: Lang }) {
           >
             ← {t.history.back}
           </button>
-          <a
-            href={`/api/reports/${selectedTask.id}/pdf`}
-            download={`viralgenie-report-${selectedTask.id}.pdf`}
-            className="px-4 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 font-medium text-sm hover:bg-zinc-50 hover:border-zinc-400 transition-all flex items-center gap-1.5"
-          >
-            <span aria-hidden>📄</span> {t.downloadPdf}
-          </a>
+          {selectedTask.status === "done" ? (
+            <a
+              href={`/api/reports/${selectedTask.id}/pdf`}
+              download={`viralgenie-report-${selectedTask.id}.pdf`}
+              className="px-4 py-2 rounded-lg border border-zinc-300 bg-white text-zinc-700 font-medium text-sm hover:bg-zinc-50 hover:border-zinc-400 transition-all flex items-center gap-1.5"
+            >
+              <span aria-hidden>📄</span> {t.downloadPdf}
+            </a>
+          ) : null}
         </div>
-        <PriorityResultsView task={selectedTask} lang={lang} />
-        <FullReportDetails task={selectedTask} lang={lang} />
+        {inProgress ? (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <Stepper status={selectedTask.status} lang={lang} />
+            <div className="mt-5 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
+                <div className="text-sm font-semibold text-zinc-900">
+                  {progressHint(selectedTask.status, lang)}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">
+                  {progressReassurance(lang)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {lang === "zh" ? "Live status" : "Live status"}
+                </div>
+                <div className="mt-2 space-y-2 text-sm text-zinc-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{lang === "zh" ? "已用时间" : "Elapsed"}</span>
+                    <span className="font-semibold text-zinc-900">
+                      {formatElapsed(selectedTask.createdAt, lang) || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{lang === "zh" ? "当前引擎" : "Current engine"}</span>
+                    <span className="font-semibold text-zinc-900">
+                      {readProviderTrace(selectedTask)?.finalEngine ??
+                        selectedTask.crawlEngine ??
+                        "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : selectedTask.status === "done" ? (
+          <>
+            <PriorityResultsView task={selectedTask} lang={lang} />
+            <FullReportDetails task={selectedTask} lang={lang} />
+          </>
+        ) : (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-6">
+            <h3 className="text-lg font-semibold text-rose-900 mb-2">
+              {t.analyze.errorTitle}
+            </h3>
+            <p className="text-rose-800 text-sm whitespace-pre-wrap">
+              {selectedTask.errorMsg ?? "Unknown error"}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -3449,14 +3754,19 @@ function HistoryTab({ lang }: { lang: Lang }) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {task.status === "done" && (
-                        <button
-                          onClick={() => setSelectedId(task.id)}
-                          className="text-xs text-purple-600 hover:text-purple-800 font-medium"
-                        >
-                          {t.history.view} →
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedId(task.id);
+                          setSelectedTask(task);
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        {task.status === "done"
+                          ? `${t.history.view} →`
+                          : lang === "zh"
+                            ? "查看进度 →"
+                            : "View progress →"}
+                      </button>
                     </td>
                   </tr>
                 );

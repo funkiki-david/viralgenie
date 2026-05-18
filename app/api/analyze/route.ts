@@ -23,6 +23,8 @@ import type {
   AnalysisType,
   CrawlEngine,
   Platform,
+  ProviderAttempt,
+  ProviderTrace,
   UnifiedContent,
   WorkspaceType,
 } from "@/src/types";
@@ -80,13 +82,21 @@ function enrichReport(args: {
     content: args.content,
     rawReport: record,
   });
+  const providerTrace =
+    args.content.metadata &&
+    typeof args.content.metadata === "object" &&
+    !Array.isArray(args.content.metadata)
+      ? (args.content.metadata.providerTrace as ProviderTrace | undefined)
+      : undefined;
 
   return {
     ...record,
     ...(studio.signalMap ? { signalMap: studio.signalMap } : {}),
     ...(studio.creativePack ? { creatorPack: studio.creativePack } : {}),
     ...(studio.launchPage ? { launchPage: studio.launchPage } : {}),
+    ...(providerTrace ? { providerTrace } : {}),
     studio,
+    ...(providerTrace && studio ? { studio: { ...studio, providerTrace } } : {}),
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -168,17 +178,51 @@ async function runPipeline(args: {
   try {
     let unified: UnifiedContent;
     let effectiveEngine = engine;
+    const providerAttempts: ProviderAttempt[] = [];
+    const timedCrawl = async (
+      crawlEngine: CrawlEngine,
+      role: ProviderAttempt["role"],
+      note?: string,
+    ) => {
+      const startedAt = Date.now();
+      const result = await crawlWithEngine({
+        url,
+        engine: crawlEngine,
+        platform,
+        analysisType,
+      });
+      providerAttempts.push({
+        engine: crawlEngine,
+        role,
+        status: result.success ? "success" : "failed",
+        durationMs: Date.now() - startedAt,
+        reason: result.success ? note : result.error,
+      });
+      return result;
+    };
 
     if (cachedData) {
       unified = cachedData;
+      providerAttempts.push({
+        engine,
+        role: "cache",
+        status: "success",
+        reason: "Reused cached content",
+      });
     } else {
       await recordUsage(engine, 0);
-      let crawl = await crawlWithEngine({ url, engine, platform, analysisType });
+      let crawl = await timedCrawl(engine, "primary");
       if (!crawl.success && engine === "tikhub") {
         const fallbackEngine = fallbackEngineFor(platform);
         if (fallbackEngine) {
           const fallbackStatus = await checkLimit(fallbackEngine);
           if (!fallbackStatus.allowed) {
+            providerAttempts.push({
+              engine: fallbackEngine,
+              role: "fallback",
+              status: "skipped",
+              reason: `Daily limit exceeded for ${fallbackEngine}`,
+            });
             await failTask(
               taskId,
               `TikHub failed (${crawl.error}); fallback ${fallbackEngine} daily limit exceeded`,
@@ -186,12 +230,7 @@ async function runPipeline(args: {
             return;
           }
           await recordUsage(fallbackEngine, 0);
-          const fallbackCrawl = await crawlWithEngine({
-            url,
-            engine: fallbackEngine,
-            platform,
-            analysisType,
-          });
+          const fallbackCrawl = await timedCrawl(fallbackEngine, "fallback");
           if (fallbackCrawl.success) {
             effectiveEngine = fallbackEngine;
             crawl = fallbackCrawl;
@@ -205,6 +244,21 @@ async function runPipeline(args: {
       }
 
       unified = crawl.data;
+      const providerTrace: ProviderTrace = {
+        primaryEngine: engine,
+        finalEngine: effectiveEngine,
+        platform,
+        cached: false,
+        fallbackUsed: effectiveEngine !== engine,
+        attempts: providerAttempts,
+      };
+      unified = {
+        ...unified,
+        metadata: {
+          ...unified.metadata,
+          providerTrace,
+        },
+      };
 
       const now = new Date();
       const expiresAt = new Date(now.getTime() + CACHE_TTL_MS);
@@ -224,6 +278,30 @@ async function runPipeline(args: {
           expiresAt,
         },
       });
+    }
+
+    if (cachedData) {
+      const cachedTrace =
+        cachedData.metadata &&
+        typeof cachedData.metadata === "object" &&
+        !Array.isArray(cachedData.metadata)
+          ? (cachedData.metadata.providerTrace as ProviderTrace | undefined)
+          : undefined;
+      unified = {
+        ...cachedData,
+        metadata: {
+          ...cachedData.metadata,
+          providerTrace:
+            cachedTrace ?? {
+              primaryEngine: engine,
+              finalEngine: engine,
+              platform,
+              cached: true,
+              fallbackUsed: false,
+              attempts: providerAttempts,
+            },
+        },
+      };
     }
 
     const markdown = normalizeToMarkdown(unified);
