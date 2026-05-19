@@ -179,13 +179,64 @@ export interface CreatorPackImagePrompts {
   dalle: string;
 }
 
+export interface CreatorPackShot {
+  index: number;
+  label: string;
+  beat: string;
+  prompt: string;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+}
+
+export interface GeneratedCoverImage {
+  provider: "openai";
+  model: "gpt-image-1";
+  prompt: string;
+  mimeType: string;
+  dataUrl: string;
+  createdAt: string;
+  revisedPrompt?: string;
+}
+
+export interface VideoDraftScene {
+  id: string;
+  label: string;
+  prompt: string;
+  durationSeconds: number;
+  ratio: string;
+  sourceShotIndexes: number[];
+  status: "pending" | "running" | "succeeded" | "failed";
+  provider: "runway";
+  model: "gen4.5";
+  createdAt: string;
+  runwayTaskId?: string;
+  outputUrl?: string;
+  error?: string;
+  completedAt?: string;
+}
+
+export interface VideoDraftReport {
+  provider: "runway";
+  model: "gen4.5";
+  ratio: string;
+  totalDurationSeconds: number;
+  status: "pending" | "running" | "succeeded" | "failed";
+  scenes: VideoDraftScene[];
+  createdAt: string;
+  completedAt?: string;
+}
+
 export interface CreatorPackReport {
   imagePrompts: CreatorPackImagePrompts;
   videoScript15s: string;
   shotPrompts: string[];
+  shotPlan: CreatorPackShot[];
   readyToPostCopy: string[];
   hookOptions: string[];
   outreachCopy: string[];
+  generatedCoverImage?: GeneratedCoverImage;
+  generatedVideoDraft?: VideoDraftReport;
 }
 
 export interface LaunchPageSection {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 
@@ -82,9 +83,52 @@ interface CreativePack {
   };
   videoScript15s?: string;
   shotPrompts?: string[];
+  shotPlan?: {
+    index: number;
+    label: string;
+    beat?: string;
+    prompt: string;
+    startTime: string;
+    endTime: string;
+    durationSeconds: number;
+  }[];
   readyToPostCopy?: string[];
   hookOptions?: string[];
   outreachCopy?: string[];
+  generatedCoverImage?: {
+    provider?: "openai";
+    model?: "gpt-image-1";
+    prompt?: string;
+    mimeType?: string;
+    dataUrl?: string;
+    createdAt?: string;
+    revisedPrompt?: string;
+  };
+  generatedVideoDraft?: {
+    provider?: "runway";
+    model?: "gen4.5";
+    ratio?: string;
+    totalDurationSeconds?: number;
+    status?: "pending" | "running" | "succeeded" | "failed";
+    scenes?: {
+      id: string;
+      label: string;
+      prompt: string;
+      durationSeconds: number;
+      ratio: string;
+      sourceShotIndexes: number[];
+      status: "pending" | "running" | "succeeded" | "failed";
+      provider: "runway";
+      model: "gen4.5";
+      createdAt: string;
+      runwayTaskId?: string;
+      outputUrl?: string;
+      error?: string;
+      completedAt?: string;
+    }[];
+    createdAt?: string;
+    completedAt?: string;
+  };
 }
 
 interface ScriptTeardownReport {
@@ -601,9 +645,19 @@ const baseI18n = {
       dalle: "DALL-E",
       videoScript15s: "15s Video Script",
       shotPrompts: "Shot Prompts",
+      shotPlan: "Shot Plan",
       readyToPostCopy: "Ready-to-post Copy",
       hookOptions: "Hook Options",
       outreachCopy: "Outreach Copy",
+      generateImage: "Generate Cover Image",
+      generatingImage: "Generating image...",
+      generatedImage: "Generated Cover Image",
+      generateVideoDraft: "Generate 15s Video Draft",
+      generatingVideoDraft: "Generating video draft...",
+      generatedVideoDraft: "Generated Video Draft",
+      sceneClips: "Scene Clips",
+      generationStatus: "Generation Status",
+      generationError: "Generation error",
       visualDirection: "Visual Direction",
       socialLinks: "Social Links",
       tone: "Tone",
@@ -888,9 +942,19 @@ const baseI18n = {
       dalle: "DALL-E",
       videoScript15s: "15 秒视频脚本",
       shotPrompts: "镜头提示词",
+      shotPlan: "镜头分镜",
       readyToPostCopy: "可直接发布文案",
       hookOptions: "钩子选项",
       outreachCopy: "外联文案",
+      generateImage: "生成封面图",
+      generatingImage: "正在生成图片...",
+      generatedImage: "已生成封面图",
+      generateVideoDraft: "生成 15 秒视频草稿",
+      generatingVideoDraft: "正在生成视频草稿...",
+      generatedVideoDraft: "已生成视频草稿",
+      sceneClips: "场景片段",
+      generationStatus: "生成状态",
+      generationError: "生成错误",
       visualDirection: "视觉方向",
       socialLinks: "社交链接",
       tone: "语气",
@@ -1827,27 +1891,74 @@ function resolvedCreativePack(task: Task): CreativePack | undefined {
   return report.studio?.creativePack ?? report.creatorPack ?? report.creativePack;
 }
 
+function hasPendingGeneratedVideo(task: Task | null): boolean {
+  if (!task) return false;
+  const draft = resolvedCreativePack(task)?.generatedVideoDraft;
+  if (!draft) return false;
+  return (
+    draft.status === "pending" ||
+    draft.status === "running" ||
+    draft.scenes?.some(
+      (scene) => scene.status === "pending" || scene.status === "running",
+    ) === true
+  );
+}
+
 function PriorityResultsView({
   task,
   lang,
+  onTaskUpdated,
 }: {
   task: Task;
   lang: Lang;
+  onTaskUpdated?: (task: Task) => void;
 }) {
   const s = i18n[lang].sections;
   const t = i18n[lang].analyze;
+  const [imageBusy, setImageBusy] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const signalMap = resolvedSignalMap(task);
   const pack = resolvedCreativePack(task);
   const creativeAngles = signalMap.creativeAngles?.filter(Boolean).slice(0, 5) ?? [];
   const relatedLinks = signalMap.relatedConnections?.slice(0, 4) ?? [];
   const hasImagePrompt =
     !!pack?.imagePrompts?.midjourney || !!pack?.imagePrompts?.dalle;
-  const hasVideo = !!pack?.videoScript15s || !!pack?.shotPrompts?.length;
+  const hasVideo =
+    !!pack?.videoScript15s || !!pack?.shotPrompts?.length || !!pack?.shotPlan?.length;
   const hasAny =
     creativeAngles.length > 0 ||
     relatedLinks.length > 0 ||
     hasImagePrompt ||
     hasVideo;
+
+  const runGeneration = async (kind: "image" | "video") => {
+    const setter = kind === "image" ? setImageBusy : setVideoBusy;
+    setter(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/generate/${kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: task.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string"
+            ? payload.error
+            : `Failed to generate ${kind}`,
+        );
+      }
+      if (payload.task) {
+        onTaskUpdated?.(payload.task as Task);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setter(false);
+    }
+  };
 
   if (!hasAny) {
     return <StudioOutputOverview task={task} lang={lang} />;
@@ -1932,6 +2043,30 @@ function PriorityResultsView({
               {pack?.imagePrompts?.dalle ?? "—"}
             </p>
           </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => void runGeneration("image")}
+              disabled={imageBusy}
+              className="rounded-full border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 transition-all hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {imageBusy ? s.generatingImage : s.generateImage}
+            </button>
+          </div>
+          {pack?.generatedCoverImage?.dataUrl ? (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+              <p className="mb-2 text-xs uppercase tracking-wide font-semibold text-zinc-500">
+                {s.generatedImage}
+              </p>
+              <Image
+                src={pack.generatedCoverImage.dataUrl}
+                alt={s.generatedImage}
+                width={1024}
+                height={1024}
+                className="w-full rounded-xl border border-zinc-200 object-cover"
+              />
+            </div>
+          ) : null}
         </div>
       </ReportCard>,
     );
@@ -1950,9 +2085,28 @@ function PriorityResultsView({
           {pack?.videoScript15s ?? "—"}
         </p>
         <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500 mb-2">
-          {s.shotPrompts}
+          {pack?.shotPlan && pack.shotPlan.length > 0 ? s.shotPlan : s.shotPrompts}
         </p>
-        {pack?.shotPrompts && pack.shotPrompts.length > 0 ? (
+        {pack?.shotPlan && pack.shotPlan.length > 0 ? (
+          <ul className="space-y-3">
+            {pack.shotPlan.map((item) => (
+              <li key={`${item.index}-${item.startTime}`} className="rounded-xl border border-zinc-200 bg-white/80 px-3 py-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  {item.startTime} - {item.endTime}
+                </div>
+                <div className="mt-1 font-semibold text-zinc-900">{item.label}</div>
+                {item.beat ? (
+                  <p className="mt-1 text-sm text-zinc-600 whitespace-pre-wrap">
+                    {item.beat}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
+                  {item.prompt}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : pack?.shotPrompts && pack.shotPrompts.length > 0 ? (
           <ul className="list-disc pl-5 space-y-2">
             {pack.shotPrompts.map((item, index) => (
               <li key={`${item}-${index}`} className="whitespace-pre-wrap">
@@ -1963,6 +2117,61 @@ function PriorityResultsView({
         ) : (
           <p>—</p>
         )}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => void runGeneration("video")}
+            disabled={videoBusy}
+            className="rounded-full border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition-all hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {videoBusy ? s.generatingVideoDraft : s.generateVideoDraft}
+          </button>
+        </div>
+        {pack?.generatedVideoDraft ? (
+          <div className="mt-4 space-y-3">
+            <div className="rounded-xl border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+              <div className="font-semibold text-zinc-900">{s.generationStatus}</div>
+              <div className="mt-1">
+                {pack.generatedVideoDraft.status ?? "pending"}
+              </div>
+            </div>
+            {pack.generatedVideoDraft.scenes && pack.generatedVideoDraft.scenes.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-wide font-semibold text-zinc-500">
+                  {s.sceneClips}
+                </p>
+                {pack.generatedVideoDraft.scenes.map((scene) => (
+                  <div
+                    key={scene.id}
+                    className="rounded-xl border border-zinc-200 bg-white p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-semibold text-zinc-900">{scene.label}</div>
+                      <div className="text-xs uppercase tracking-wide text-zinc-500">
+                        {scene.status}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600 whitespace-pre-wrap">
+                      {scene.prompt}
+                    </p>
+                    {scene.outputUrl ? (
+                      <video
+                        className="mt-3 w-full rounded-xl border border-zinc-200"
+                        controls
+                        src={scene.outputUrl}
+                      />
+                    ) : null}
+                    {scene.error ? (
+                      <p className="mt-2 text-sm text-rose-700">
+                        {s.generationError}: {scene.error}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </ReportCard>,
     );
   }
@@ -1980,6 +2189,12 @@ function PriorityResultsView({
           {t.priorityHelper}
         </p>
       </div>
+
+      {actionError ? (
+        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {actionError}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">{cards}</div>
     </section>
@@ -3062,7 +3277,12 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
   // Polling
   useEffect(() => {
     if (!task) return;
-    if (task.status === "done" || task.status === "failed") return;
+    if (
+      (task.status === "done" || task.status === "failed") &&
+      !hasPendingGeneratedVideo(task)
+    ) {
+      return;
+    }
 
     const intervalId = setInterval(async () => {
       try {
@@ -3092,7 +3312,13 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
   }, [task]);
 
   useEffect(() => {
-    if (!task || task.status === "done" || task.status === "failed") return;
+    if (
+      !task ||
+      ((task.status === "done" || task.status === "failed") &&
+        !hasPendingGeneratedVideo(task))
+    ) {
+      return;
+    }
     const intervalId = setInterval(() => {
       setElapsedTick((value) => value + 1);
     }, 1000);
@@ -3162,7 +3388,7 @@ function AnalyzeTab({ lang }: { lang: Lang }) {
           </span>
           <PlatformBadge platform={task.urlType as Platform} lang={lang} />
         </div>
-        <PriorityResultsView task={task} lang={lang} />
+        <PriorityResultsView task={task} lang={lang} onTaskUpdated={setTask} />
         <FullReportDetails task={task} lang={lang} />
       </div>
     );
@@ -3526,7 +3752,8 @@ function HistoryTab({ lang }: { lang: Lang }) {
         );
         if (
           intervalId &&
-          (nextTask.status === "done" || nextTask.status === "failed")
+          (nextTask.status === "done" || nextTask.status === "failed") &&
+          !hasPendingGeneratedVideo(nextTask)
         ) {
           clearInterval(intervalId);
         }
@@ -3618,7 +3845,18 @@ function HistoryTab({ lang }: { lang: Lang }) {
           </div>
         ) : selectedTask.status === "done" ? (
           <>
-            <PriorityResultsView task={selectedTask} lang={lang} />
+            <PriorityResultsView
+              task={selectedTask}
+              lang={lang}
+              onTaskUpdated={(nextTask) => {
+                setSelectedTask(nextTask);
+                setTasks((prev) =>
+                  prev
+                    ? prev.map((task) => (task.id === nextTask.id ? nextTask : task))
+                    : prev,
+                );
+              }}
+            />
             <FullReportDetails task={selectedTask} lang={lang} />
           </>
         ) : (

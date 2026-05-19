@@ -15,6 +15,7 @@ import type {
   UnifiedContent,
   WorkspaceType,
 } from "@/src/types";
+import { parseVideoScriptToShots } from "@/src/lib/media/creator-pack";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -343,6 +344,14 @@ function buildCreatorPack(raw: Record<string, unknown>): CreatorPackReport {
     ...flattenStrings(pack.readyToPostCopy, 3),
   ]).slice(0, 5);
 
+  const videoScript15s =
+    typeof pack.videoScript15s === "string" ? pack.videoScript15s : "";
+  const shotPrompts = dedupeStrings(flattenStrings(pack.shotPrompts, 8));
+  const shotPlan = parseVideoScriptToShots({
+    videoScript15s,
+    shotPrompts,
+  });
+
   return {
     imagePrompts: {
       midjourney:
@@ -351,15 +360,27 @@ function buildCreatorPack(raw: Record<string, unknown>): CreatorPackReport {
           : "",
       dalle: typeof imagePrompts.dalle === "string" ? imagePrompts.dalle : "",
     },
-    videoScript15s:
-      typeof pack.videoScript15s === "string" ? pack.videoScript15s : "",
-    shotPrompts: dedupeStrings(flattenStrings(pack.shotPrompts, 8)),
+    videoScript15s,
+    shotPrompts,
+    shotPlan,
     readyToPostCopy: dedupeStrings(flattenStrings(pack.readyToPostCopy, 6)).slice(
       0,
       3,
     ),
     hookOptions,
     outreachCopy,
+    generatedCoverImage:
+      pack.generatedCoverImage &&
+      typeof pack.generatedCoverImage === "object" &&
+      !Array.isArray(pack.generatedCoverImage)
+        ? (pack.generatedCoverImage as CreatorPackReport["generatedCoverImage"])
+        : undefined,
+    generatedVideoDraft:
+      pack.generatedVideoDraft &&
+      typeof pack.generatedVideoDraft === "object" &&
+      !Array.isArray(pack.generatedVideoDraft)
+        ? (pack.generatedVideoDraft as CreatorPackReport["generatedVideoDraft"])
+        : undefined,
   };
 }
 

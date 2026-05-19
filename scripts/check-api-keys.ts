@@ -140,6 +140,53 @@ async function checkFirecrawl(): Promise<CheckResult> {
   }
 }
 
+async function checkOpenAiImage(): Promise<CheckResult> {
+  const key = env("OPENAI_API_KEY");
+  if (!key) return result("OPENAI_API_KEY", "skip", "Not set");
+  if (!live) {
+    return result(
+      "OPENAI_API_KEY",
+      "skip",
+      `Set (${mask(key)}). Use --live to generate a tiny image.`,
+    );
+  }
+
+  try {
+    const response = await withTimeout(30000, () =>
+      fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-image-1",
+          prompt: "Minimal black circle on a white background",
+          size: "1024x1024",
+          quality: "low",
+          output_format: "webp",
+        }),
+      }),
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = payload && typeof payload === "object" ? (payload as Record<string, unknown>).error : null;
+      const message =
+        error && typeof error === "object" && typeof (error as Record<string, unknown>).message === "string"
+          ? (error as Record<string, unknown>).message
+          : response.statusText;
+      throw new Error(`HTTP ${response.status}: ${message}`);
+    }
+    return result("OPENAI_API_KEY", "pass", "OpenAI image generation succeeded");
+  } catch (err) {
+    return result(
+      "OPENAI_API_KEY",
+      "fail",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 async function checkSupadata(): Promise<CheckResult> {
   const key = env("SUPADATA_API_KEY");
   if (!key) return result("SUPADATA_API_KEY", "fail", "Not set");
@@ -316,6 +363,41 @@ async function checkRNote(): Promise<CheckResult> {
   }
 }
 
+async function checkRunway(): Promise<CheckResult> {
+  const key = env("RUNWAY_API_KEY");
+  if (!key) return result("RUNWAY_API_KEY", "skip", "Not set");
+  if (!live) {
+    return result(
+      "RUNWAY_API_KEY",
+      "skip",
+      `Set (${mask(key)}). Use --live to fetch account metadata.`,
+    );
+  }
+
+  try {
+    const res = await withTimeout(15000, () =>
+      fetch("https://api.dev.runwayml.com/v1/organization", {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "X-Runway-Version": "2024-11-06",
+          Accept: "application/json",
+        },
+      }),
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200) || res.statusText}`);
+    }
+    return result("RUNWAY_API_KEY", "pass", "Runway organization request succeeded");
+  } catch (err) {
+    return result(
+      "RUNWAY_API_KEY",
+      "fail",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 async function checkAmazonScraperApi(): Promise<CheckResult> {
   const key = env("AMAZON_SCRAPER_API_KEY");
   if (!key) return result("AMAZON_SCRAPER_API_KEY", "skip", "Not set");
@@ -387,10 +469,12 @@ async function main() {
     checkDatabase(),
     checkAnthropic(),
     checkFirecrawl(),
+    checkOpenAiImage(),
     checkSupadata(),
     checkApify(),
     checkTikHub(),
     checkRNote(),
+    checkRunway(),
     checkAmazonScraperApi(),
   ]);
 
